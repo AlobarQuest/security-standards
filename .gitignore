@@ -1,0 +1,11 @@
+# Never commit secrets or local credentials (this tool, of all repos, must be clean)
+.env
+*.env
+**/env
+*-migration/
+*.password
+*_password
+*.key
+*.pem
+id_*
+.DS_Store
