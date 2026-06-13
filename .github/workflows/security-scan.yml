@@ -1,0 +1,17 @@
+name: Security Scan
+on:
+  push:
+  pull_request:
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history for the history-scope check
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Security scan (fails on BLOCK)
+        run: python -m security_scan.cli . --category security

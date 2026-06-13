@@ -1,0 +1,41 @@
+[
+  {"id": "bws.no-token-in-tracked-files", "severity": "BLOCK",
+   "reason": "A committed BWS machine-account token is a credential leak.",
+   "check": {"kind": "forbidden_pattern", "pattern": "0\\.[0-9a-f-]{36}\\.[A-Za-z0-9+/=:_-]{20,}", "scope": "tracked"},
+   "remediation": "Remove the token; move it to a gitignored env file sourced at runtime; ROTATE the exposed token."},
+
+  {"id": "bws.no-token-in-git-history", "severity": "BLOCK",
+   "reason": "Git history retains a token even after it is removed from the working tree.",
+   "check": {"kind": "forbidden_pattern", "pattern": "0\\.[0-9a-f-]{36}\\.[A-Za-z0-9+/=:_-]{20,}", "scope": "history"},
+   "remediation": "Rotate/revoke the token; optionally scrub history with git filter-repo."},
+
+  {"id": "bws.bootstrap-token-not-inline", "severity": "BLOCK",
+   "reason": "The bootstrap BWS_ACCESS_TOKEN must never be inline in committed config.",
+   "check": {"kind": "forbidden_pattern", "pattern": "BWS_ACCESS_TOKEN\\s*[=:]\\s*['\"]?0\\.", "scope": "tracked"},
+   "remediation": "Source BWS_ACCESS_TOKEN from a gitignored env file; never inline it in a plist/compose/script."},
+
+  {"id": "bws.secret-files-gitignored", "severity": "BLOCK",
+   "reason": "Files that hold BWS secrets must be gitignored so the next commit can't leak them.",
+   "check": {"kind": "gitignore_covers", "globs": ["*.env", "*-migration/", "*.password", "*.key"]},
+   "remediation": "Add the secret-bearing path/pattern to .gitignore."},
+
+  {"id": "bws.reference-by-stable-uuid", "severity": "WARN",
+   "reason": "The secret UUID is immutable; the name is a mutable label that will be renamed and break by-name fetches.",
+   "check": {"kind": "forbidden_pattern", "pattern": "fetch_bws_secret_by_name", "scope": "tracked"},
+   "remediation": "Reference secrets by stable UUID (bws secret get <uuid>), not by name. The UUID is non-secret, so hardcoding it is fine."},
+
+  {"id": "bws.secret-manifest-present", "severity": "WARN",
+   "reason": "Repos that consume BWS secrets must declare which UUIDs they use.",
+   "check": {"kind": "manifest_present"},
+   "remediation": "Add a .bws-secrets.toml declaring the secret UUIDs this repo consumes."},
+
+  {"id": "bws.manifest-matches-usage", "severity": "WARN",
+   "reason": "The manifest must match reality or it rots into fiction.",
+   "check": {"kind": "manifest_matches_usage"},
+   "remediation": "Add undeclared UUIDs to the manifest; remove stale entries."},
+
+  {"id": "bws.least-privilege-scope", "severity": "INFO",
+   "reason": "A workload's machine-account should be scoped to only the projects its secrets need.",
+   "check": {"kind": "judgment"},
+   "remediation": "Using the manifest's UUIDs, confirm the workload's machine-account is scoped to only the projects those secrets live in."}
+]
