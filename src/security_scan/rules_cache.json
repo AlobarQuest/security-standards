@@ -14,8 +14,8 @@
    "check": {"kind": "forbidden_pattern", "pattern": "BWS_ACCESS_TOKEN\\s*[=:]\\s*['\"]?0\\.", "scope": "tracked"},
    "remediation": "Source BWS_ACCESS_TOKEN from a gitignored env file; never inline it in a plist/compose/script."},
 
-  {"id": "bws.secret-files-gitignored", "severity": "BLOCK",
-   "reason": "Files that hold BWS secrets must be gitignored so the next commit can't leak them.",
+  {"id": "bws.secret-files-gitignored", "severity": "WARN",
+   "reason": "Files that hold BWS secrets must be gitignored so the next commit can't leak them. (WARN, not BLOCK: this is a preventive pattern-coverage check, not an actual exposed-file detection — a committed secret file is still caught by the no-token rules.)",
    "check": {"kind": "gitignore_covers", "globs": ["*.env", "*-migration/", "*.password", "*.key"]},
    "remediation": "Add the secret-bearing path/pattern to .gitignore."},
 

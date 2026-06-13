@@ -10,10 +10,12 @@ current repo. The first standard set is BWS (Bitwarden Secrets Manager) proper u
 
 ## Steps
 
-1. **Run the deterministic scanner** from the repo root:
-   `python -m security_scan.cli . --category security`
-   (Install once: `pip install -e <path-to>/security-standards`. It reads rules live from
-   infra-brain if `INFRABRAIN_BASE_URL`/`INFRABRAIN_ACCESS_KEY` are set, else the bundled cache.)
+1. **Run the deterministic scanner** against the repo you're in (no install needed — run it off
+   the source tree via `PYTHONPATH`):
+   `PYTHONPATH="$HOME/Projects/security-standards/src" python3 -m security_scan.cli . --category security`
+   (Scan another repo by passing its path instead of `.`. It reads rules live from infra-brain if
+   `INFRABRAIN_BASE_URL`/`INFRABRAIN_ACCESS_KEY` are set, else the bundled offline cache — both give
+   identical findings. The scanner is read-only and exits non-zero if any BLOCK finding is present.)
 
 2. **Read the findings JSON.** For each finding: `severity`, `file:line`, `evidence` (redacted),
    `remediation`, `reason`, `kind`.
