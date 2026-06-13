@@ -1,0 +1,40 @@
+# Allowlist of known-safe scanner findings — THIS repo only.
+# A security scanner's own test fixtures and design docs necessarily embed example
+# tokens that match the real BWS pattern. Each entry exempts ONE exact finding
+# (rule + file + the redacted match string). A real token in any other file, or a
+# different token string in these files, still BLOCKs: the length in `evidence`
+# changes, so the allowlist fails closed and forces a conscious re-review.
+
+[[allow]]
+rule = "bws.no-token-in-tracked-files"
+file = "docs/superpowers/plans/2026-06-12-security-standards-bws-scanner.md"
+evidence = "0.45eb08…(len 63)"
+reason = "Example token in the implementation plan doc."
+
+[[allow]]
+rule = "bws.no-token-in-tracked-files"
+file = "docs/superpowers/plans/2026-06-12-security-standards-bws-scanner.md"
+evidence = "0.45eb08…(len 60)"
+reason = "Example token in the implementation plan doc."
+
+[[allow]]
+rule = "bws.no-token-in-tracked-files"
+file = "tests/test_cli.py"
+evidence = "0.45eb08…(len 59)"
+reason = "Fixture token proving the tracked-file scan catches a leak."
+
+[[allow]]
+rule = "bws.no-token-in-tracked-files"
+file = "tests/test_findings.py"
+evidence = "0.45eb08…(len 63)"
+reason = "Fixture token for redaction tests."
+
+[[allow]]
+rule = "bws.no-token-in-tracked-files"
+file = "tests/test_predicates.py"
+evidence = "0.45eb08…(len 60)"
+reason = "Fixture token proving the predicate catches a leak."
+
+[[allow]]
+rule = "bws.no-token-in-git-history"
+reason = "This repo's git history permanently contains the TDD fixture tokens; unavoidable for a scanner's own test suite. The history check is a repo-wide boolean (no file/evidence to pin)."
