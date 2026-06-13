@@ -48,3 +48,19 @@ def test_manifest_rules(git_repo, tmp_path, monkeypatch):
     ids = {f["rule_id"] for f in report["findings"]}
     assert "bws.secret-manifest-present" in ids        # no manifest, but BWS used
     assert "bws.manifest-matches-usage" in ids          # undeclared uuid
+
+
+def test_bundled_cache_has_v1_bws_rules():
+    from security_scan.cli import _DEFAULT_CACHE
+    import json as _json
+    rules = _json.loads(_DEFAULT_CACHE.read_text())
+    ids = {r["id"] for r in rules}
+    assert {
+        "bws.no-token-in-tracked-files", "bws.no-token-in-git-history",
+        "bws.secret-files-gitignored", "bws.bootstrap-token-not-inline",
+        "bws.reference-by-stable-uuid", "bws.secret-manifest-present",
+        "bws.manifest-matches-usage", "bws.least-privilege-scope",
+    } <= ids
+    for r in rules:
+        assert r["severity"] in ("BLOCK", "WARN", "INFO")
+        assert "check" in r and "remediation" in r and "reason" in r
