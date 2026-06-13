@@ -64,3 +64,25 @@ def test_bundled_cache_has_v1_bws_rules():
     for r in rules:
         assert r["severity"] in ("BLOCK", "WARN", "INFO")
         assert "check" in r and "remediation" in r and "reason" in r
+
+
+def test_allowlist_suppresses_block_and_restores_exit_zero(git_repo, tmp_path, monkeypatch):
+    monkeypatch.delenv("INFRABRAIN_BASE_URL", raising=False)
+    git_repo.write("a.sh", "T=0.45eb083f-4b05-4251-924d-b46700e5a643.SECRET:MOREMORE==XXX\n")
+    git_repo.commit()
+    cache = _cache(tmp_path, [{
+        "id": "bws.no-token-in-tracked-files", "severity": "BLOCK",
+        "check": {"kind": "forbidden_pattern",
+                  "pattern": r"0\.[0-9a-f-]{36}\.[A-Za-z0-9+/=:_-]{20,}", "scope": "tracked"},
+        "remediation": "remove it", "reason": "leak"}])
+    report, code = cli.scan(repo_path=git_repo.path, cache_path=cache, category="security")
+    assert code == 1
+    ev = report["findings"][0]["evidence"]
+    git_repo.write(".security-scan-allow.toml",
+        f'[[allow]]\nrule = "bws.no-token-in-tracked-files"\nfile = "a.sh"\nevidence = "{ev}"\n')
+    git_repo.commit()
+    report2, code2 = cli.scan(repo_path=git_repo.path, cache_path=cache, category="security")
+    assert code2 == 0
+    assert report2["summary"]["by_severity"]["BLOCK"] == 0
+    assert report2["meta"]["allowlisted"] == 1
+    assert report2["allowlisted"][0]["rule_id"] == "bws.no-token-in-tracked-files"

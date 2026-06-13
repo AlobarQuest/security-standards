@@ -2,7 +2,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from security_scan import predicates, manifest
+from security_scan import predicates, manifest, allowlist as allowlist_mod
 from security_scan.findings import Finding, Severity
 from security_scan.rules import load_rules
 
@@ -50,13 +50,20 @@ def scan(repo_path, cache_path=_DEFAULT_CACHE, category="security") -> tuple[dic
         else:
             findings += predicates.evaluate(rule, repo_path)
 
-    by_sev = {s.value: 0 for s in Severity}
+    entries = allowlist_mod.load(repo_path)
+    active, suppressed = [], []
     for f in findings:
+        (suppressed if allowlist_mod.is_allowed(f, entries) else active).append(f)
+
+    by_sev = {s.value: 0 for s in Severity}
+    for f in active:
         by_sev[f.severity.value] += 1
     report = {
-        "meta": {"rules_source": source, "rules_evaluated": len(rules)},
-        "summary": {"by_severity": by_sev, "total": len(findings)},
-        "findings": [f.to_dict() for f in findings],
+        "meta": {"rules_source": source, "rules_evaluated": len(rules),
+                 "allowlisted": len(suppressed)},
+        "summary": {"by_severity": by_sev, "total": len(active)},
+        "findings": [f.to_dict() for f in active],
+        "allowlisted": [f.to_dict() for f in suppressed],
     }
     exit_code = 1 if by_sev["BLOCK"] > 0 else 0
     return report, exit_code
