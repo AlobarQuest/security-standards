@@ -35,6 +35,29 @@ file = "tests/test_predicates.py"
 evidence = "0.45eb08…(len 60)"
 reason = "Fixture token proving the predicate catches a leak."
 
+# History fixture tokens are pinned per-commit (not rule-wide): a NEW token in a NEW
+# commit produces an unpinned finding and still BLOCKs.
 [[allow]]
 rule = "bws.no-token-in-git-history"
-reason = "This repo's git history permanently contains the TDD fixture tokens; unavoidable for a scanner's own test suite. The history check is a repo-wide boolean (no file/evidence to pin)."
+evidence = "pattern present in git history (commit 38fec436497f)"
+reason = "TDD fixture/example token committed during the scanner's own development."
+
+[[allow]]
+rule = "bws.no-token-in-git-history"
+evidence = "pattern present in git history (commit 47ea6dd4006e)"
+reason = "TDD fixture/example token committed during the scanner's own development."
+
+[[allow]]
+rule = "bws.no-token-in-git-history"
+evidence = "pattern present in git history (commit d853bb31050b)"
+reason = "TDD fixture/example token committed during the scanner's own development."
+
+[[allow]]
+rule = "bws.no-token-in-git-history"
+evidence = "pattern present in git history (commit d451a3618989)"
+reason = "TDD fixture/example token committed during the scanner's own development."
+
+[[allow]]
+rule = "bws.no-token-in-git-history"
+evidence = "pattern present in git history (commit 8e37a6c381de)"
+reason = "TDD fixture/example token committed during the scanner's own development."
