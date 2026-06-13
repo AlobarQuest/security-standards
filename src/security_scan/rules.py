@@ -18,6 +18,14 @@ def _coerce(rule: dict) -> dict:
     # infra-brain's add_rule has no `remediation` field, so live rules carry it folded into
     # `reason` (see seed script). Default it so downstream rule["remediation"] is always safe.
     rule.setdefault("remediation", rule.get("reason", ""))
+    # Normalize rule identity across sources. The bundled cache uses a semantic string `id`
+    # (e.g. "bws.no-token-in-tracked-files"); live infra-brain rules carry a numeric `id` and
+    # store the semantic slug in the `rule` field (see seed script). Prefer the slug so finding
+    # rule_ids and allowlist keys are identical in cache and live mode. A slug looks like a
+    # dotted token with no spaces; prose `rule` statements (with spaces) are left as-is.
+    slug = rule.get("rule")
+    if isinstance(slug, str) and slug and " " not in slug and "." in slug:
+        rule["id"] = slug
     return rule
 
 
