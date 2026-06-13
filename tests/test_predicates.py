@@ -28,8 +28,9 @@ def test_forbidden_pattern_history_scope(git_repo):
     rule = _rule({"kind": "forbidden_pattern",
                   "pattern": r"0\.[0-9a-f-]{36}\.", "scope": "history"})
     findings = predicates.evaluate(rule, git_repo.path)
-    assert len(findings) == 1
+    assert len(findings) >= 1
     assert "history" in findings[0].evidence.lower()
+    assert "commit" in findings[0].evidence.lower()
 
 
 def test_clean_repo_yields_nothing(git_repo):

@@ -30,3 +30,19 @@ def test_live_fetch_filters_to_rules_with_checks(monkeypatch, tmp_path):
     loaded, source = rules.load_rules(category="security", cache_path=tmp_path / "nope.json")
     assert source == "live"
     assert len(loaded) == 1 and loaded[0]["id"] == 1
+
+
+def test_empty_live_falls_back_to_cache(monkeypatch, tmp_path):
+    cache = tmp_path / "cache.json"
+    cache.write_text(json.dumps([
+        {"id": "bws.x", "severity": "BLOCK",
+         "check": {"kind": "forbidden_pattern", "pattern": "p", "scope": "tracked"},
+         "remediation": "r", "reason": "y"}]))
+    def fake_get(url, headers, timeout):
+        return {"rules": []}        # endpoint reachable but returns nothing usable
+    monkeypatch.setattr(rules, "_http_get_json", fake_get)
+    monkeypatch.setenv("INFRABRAIN_BASE_URL", "https://ib.example")
+    monkeypatch.setenv("INFRABRAIN_ACCESS_KEY", "k")
+    loaded, source = rules.load_rules(category="security", cache_path=cache)
+    assert source == "cache"
+    assert loaded[0]["id"] == "bws.x"

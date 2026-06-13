@@ -38,7 +38,7 @@ def load_rules(category: str, cache_path: Path) -> tuple[list[dict], str]:
     """Returns (rules, source) where source is 'live' or 'cache'.
     Rules are filtered to those carrying a `check`, with severity coerced to Severity."""
     live = _fetch_live(category)
-    if live is not None:
+    if live:   # non-empty only; empty/None → fall through to cache (fail safe, never silent-pass)
         return [_coerce(r) for r in live], "live"
     cached = json.loads(Path(cache_path).read_text())
     return [_coerce(r) for r in cached], "cache"

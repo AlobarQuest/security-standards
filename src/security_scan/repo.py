@@ -13,7 +13,14 @@ class Hit:
 
 def _git(repo_path, *args) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], cwd=repo_path,
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, timeout=30)
+
+
+def is_git_repo(repo_path) -> bool:
+    """True only if repo_path is inside a usable git work tree.
+    The scan relies entirely on git; if this is False the scan must fail closed."""
+    res = _git(repo_path, "rev-parse", "--is-inside-work-tree")
+    return res.returncode == 0 and res.stdout.strip() == "true"
 
 
 def tracked_files(repo_path) -> list[str]:
@@ -38,11 +45,11 @@ def grep_tracked(repo_path, pattern: str) -> list[Hit]:
     return hits
 
 
-def grep_history(repo_path, pattern: str) -> bool:
-    """True if the pattern appears anywhere in commit history (added or removed).
-    Uses `git log -G<pattern>` which lists commits whose diff matches."""
-    res = _git(repo_path, "log", "--all", "-G", pattern, "--oneline")
-    return bool(res.stdout.strip())
+def grep_history(repo_path, pattern: str) -> list[str]:
+    """Commit SHAs whose diff added or removed a line matching the pattern.
+    Uses `git log --all -G<pattern>`. Returns full SHAs (newest first); empty if none."""
+    res = _git(repo_path, "log", "--all", "-G", pattern, "--format=%H")
+    return [s for s in res.stdout.splitlines() if s]
 
 
 def is_ignored(repo_path, path: str) -> bool:

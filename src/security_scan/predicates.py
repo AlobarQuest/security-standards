@@ -1,4 +1,5 @@
 import fnmatch
+import re
 from pathlib import Path
 from security_scan import repo
 from security_scan.findings import Finding, redact
@@ -15,10 +16,9 @@ def _forbidden_pattern(rule, repo_path) -> list[Finding]:
     scope = check.get("scope", "tracked")
     pattern = check["pattern"]
     if scope == "history":
-        if repo.grep_history(repo_path, pattern):
-            return [_finding(rule, file=None, line=None,
-                             evidence="pattern present in git history")]
-        return []
+        return [_finding(rule, file=None, line=None,
+                         evidence=f"pattern present in git history (commit {sha[:12]})")
+                for sha in repo.grep_history(repo_path, pattern)]
     # tracked (default)
     return [_finding(rule, file=h.file, line=h.line, evidence=redact(h.match))
             for h in repo.grep_tracked(repo_path, pattern)]
@@ -47,7 +47,6 @@ def _path_absent(rule, repo_path) -> list[Finding]:
 
 
 def _required_pattern(rule, repo_path) -> list[Finding]:
-    import re
     rx = re.compile(rule["check"]["pattern"])
     globs = rule["check"].get("globs", ["*"])
     relevant = [p for p in repo.tracked_files(repo_path)
@@ -66,13 +65,10 @@ def _required_pattern(rule, repo_path) -> list[Finding]:
 
 _DISPATCH = {
     "forbidden_pattern": _forbidden_pattern,
-}
-
-_DISPATCH.update({
     "gitignore_covers": _gitignore_covers,
     "path_absent": _path_absent,
     "required_pattern": _required_pattern,
-})
+}
 
 
 def evaluate(rule, repo_path) -> list[Finding]:

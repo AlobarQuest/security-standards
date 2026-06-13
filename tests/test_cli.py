@@ -86,3 +86,42 @@ def test_allowlist_suppresses_block_and_restores_exit_zero(git_repo, tmp_path, m
     assert report2["summary"]["by_severity"]["BLOCK"] == 0
     assert report2["meta"]["allowlisted"] == 1
     assert report2["allowlisted"][0]["rule_id"] == "bws.no-token-in-tracked-files"
+
+
+def test_non_git_path_fails_closed(tmp_path, monkeypatch):
+    monkeypatch.delenv("INFRABRAIN_BASE_URL", raising=False)
+    nongit = tmp_path / "plain"
+    nongit.mkdir()
+    cache = _cache(tmp_path, [])
+    report, code = cli.scan(repo_path=nongit, cache_path=cache, category="security")
+    assert code == 1
+    assert report["findings"][0]["rule_id"] == "scan.not-a-git-repo"
+    assert report["summary"]["by_severity"]["BLOCK"] == 1
+
+
+def test_gitignore_rule_skipped_when_no_bws_usage(git_repo, tmp_path, monkeypatch):
+    monkeypatch.delenv("INFRABRAIN_BASE_URL", raising=False)
+    git_repo.write("main.py", "print('hi')\n")        # no BWS usage anywhere
+    git_repo.write(".gitignore", "*.log\n")            # does NOT cover *.env
+    git_repo.commit()
+    cache = _cache(tmp_path, [{
+        "id": "bws.secret-files-gitignored", "severity": "BLOCK",
+        "check": {"kind": "gitignore_covers", "globs": ["*.env"]},
+        "remediation": "add to gitignore", "reason": "secret files must be ignored"}])
+    report, code = cli.scan(repo_path=git_repo.path, cache_path=cache, category="security")
+    assert code == 0
+    assert report["findings"] == []
+
+
+def test_gitignore_rule_fires_when_repo_uses_bws(git_repo, tmp_path, monkeypatch):
+    monkeypatch.delenv("INFRABRAIN_BASE_URL", raising=False)
+    git_repo.write("start.sh", "bws secret get 45eb083f-4b05-4251-924d-b46700e5a643\n")
+    git_repo.write(".gitignore", "*.log\n")            # does NOT cover *.env
+    git_repo.commit()
+    cache = _cache(tmp_path, [{
+        "id": "bws.secret-files-gitignored", "severity": "BLOCK",
+        "check": {"kind": "gitignore_covers", "globs": ["*.env"]},
+        "remediation": "add to gitignore", "reason": "secret files must be ignored"}])
+    report, code = cli.scan(repo_path=git_repo.path, cache_path=cache, category="security")
+    assert code == 1
+    assert any(f["rule_id"] == "bws.secret-files-gitignored" for f in report["findings"])
