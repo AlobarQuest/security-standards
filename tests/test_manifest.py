@@ -1,3 +1,5 @@
+import tomllib
+
 from security_scan import manifest
 
 
@@ -27,3 +29,38 @@ def test_diff_reports_undeclared_and_stale(git_repo):
     assert d.undeclared == {"45eb083f-4b05-4251-924d-b46700e5a643"}
     assert d.stale == {"99999999-0000-0000-0000-000000000000"}
     assert d.manifest_exists is True
+
+
+def test_referenced_uuids_excludes_docs_and_markdown(git_repo):
+    # "consumes a BWS secret" means runtime code, not prose. A UUID mentioned only
+    # in docs/ or a .md file is documentation, not consumption, and must not count.
+    git_repo.write("run.sh", 'bws secret get aaaaaaaa-1111-2222-3333-444444444444\n')
+    git_repo.write("docs/plan.md", 'bws secret get bbbbbbbb-1111-2222-3333-444444444444\n')
+    git_repo.write("BACKUP.md", 'fetch_bws_secret "cccccccc-1111-2222-3333-444444444444"\n')
+    git_repo.commit()
+    found = manifest.referenced_uuids(git_repo.path)
+    assert found == {"aaaaaaaa-1111-2222-3333-444444444444"}
+
+
+def test_build_manifest_renders_deterministic_enriched_toml():
+    toml = manifest.build_manifest(
+        {"bbbbbbbb-1111-2222-3333-444444444444", "aaaaaaaa-1111-2222-3333-444444444444"},
+        enrich={"aaaaaaaa-1111-2222-3333-444444444444": {"name": "TOKEN_A", "project": "proj1"}})
+    data = tomllib.loads(toml)
+    secrets = data["secret"]
+    # sorted by uuid for stable, diff-friendly output
+    assert [s["uuid"] for s in secrets] == [
+        "aaaaaaaa-1111-2222-3333-444444444444",
+        "bbbbbbbb-1111-2222-3333-444444444444",
+    ]
+    assert secrets[0]["name"] == "TOKEN_A"
+    assert secrets[0]["project"] == "proj1"
+    # an un-enriched UUID still appears (flagged), never silently dropped
+    assert "name" not in secrets[1] or secrets[1]["name"] == ""
+
+
+def test_build_manifest_output_satisfies_declared_uuids(git_repo):
+    refd = {"aaaaaaaa-1111-2222-3333-444444444444", "dddddddd-1111-2222-3333-444444444444"}
+    git_repo.write(".bws-secrets.toml", manifest.build_manifest(refd, enrich={}))
+    git_repo.commit()
+    assert manifest.declared_uuids(git_repo.path) == refd
