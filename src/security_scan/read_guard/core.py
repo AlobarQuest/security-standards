@@ -34,13 +34,13 @@ _SECRET_PATH_RX = _re.compile(
 )
 
 
-def is_secret_path(path) -> bool:
+def is_secret_path(path: str | None) -> bool:
     if not path:
         return False
     return _SECRET_PATH_RX.search(path) is not None
 
 
-def extract_path(envelope: dict):
+def extract_path(envelope: dict) -> str | None:
     ti = envelope.get("tool_input") or {}
     if envelope.get("tool_name") == "Read":
         return ti.get("file_path")

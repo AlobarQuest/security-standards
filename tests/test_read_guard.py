@@ -1,6 +1,4 @@
 import json
-import os
-import re
 import time as _time
 import uuid
 import pytest
