@@ -5,6 +5,9 @@ missing guard removes protection with no signal. These checks make that loud.
 """
 import json
 import os
+import subprocess
+import tempfile
+import uuid
 from dataclasses import dataclass
 
 _DEFAULT_SETTINGS = os.path.expanduser("~/.claude/settings.json")
@@ -40,3 +43,50 @@ def check_presence(settings_path: str = _DEFAULT_SETTINGS,
     if not os.access(shim_path, os.X_OK):
         return Result(False, f"shim not executable: {shim_path}")
     return Result(True, "read-guard wired (Read -> shim, executable)")
+
+
+def _envelope(file_path: str) -> str:
+    return json.dumps({"tool_name": "Read", "tool_input": {"file_path": file_path}})
+
+
+def check_canary(shim_path: str = _DEFAULT_SHIM) -> Result:
+    """Functional, end-to-end through the real shim: a token file must be denied,
+    a clean file allowed. Builds a synthetic token at runtime; isolates audit writes
+    to a temp path; cleans up. Any failure/exception -> not-ok."""
+    if not os.path.isfile(shim_path):
+        return Result(False, f"shim missing: {shim_path}")
+    tmpdir = tempfile.mkdtemp(prefix="rg-canary-")
+    secret = os.path.join(tmpdir, "secret.env")
+    clean = os.path.join(tmpdir, "clean.txt")
+    try:
+        token = "0." + str(uuid.uuid4()) + "." + ("A" * 30)  # runtime-built; never a literal
+        with open(secret, "w") as f:
+            f.write(f"BWS_ACCESS_TOKEN={token}\n")
+        with open(clean, "w") as f:
+            f.write("nothing here\n")
+        env = {**os.environ, "READ_GUARD_AUDIT_LOG": os.path.join(tmpdir, "audit.jsonl")}
+        deny = subprocess.run([shim_path], input=_envelope(secret), capture_output=True,
+                              text=True, env=env, timeout=10)
+        try:
+            decision = json.loads(deny.stdout)["hookSpecificOutput"]["permissionDecision"]
+        except Exception:
+            return Result(False, f"shim emitted no deny decision for a token file (stdout={deny.stdout[:200]!r})")
+        if decision != "deny":
+            return Result(False, f"shim returned '{decision}', expected 'deny' for a token file")
+        allow = subprocess.run([shim_path], input=_envelope(clean), capture_output=True,
+                               text=True, env=env, timeout=10)
+        if allow.stdout.strip():
+            return Result(False, f"shim did not allow a clean file (stdout={allow.stdout[:200]!r})")
+        return Result(True, "canary ok (token file denied, clean file allowed)")
+    except Exception as e:
+        return Result(False, f"canary error: {e}")
+    finally:
+        for n in ("secret.env", "clean.txt", "audit.jsonl"):
+            try:
+                os.remove(os.path.join(tmpdir, n))
+            except OSError:
+                pass
+        try:
+            os.rmdir(tmpdir)
+        except OSError:
+            pass
