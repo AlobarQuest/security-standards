@@ -1,3 +1,5 @@
+import json
+import os
 import re
 import uuid
 import pytest
@@ -110,3 +112,52 @@ def test_decide_missing_output_secret_path_suppresses():
 def test_decide_missing_output_normal_path_fail_open():
     d = core.decide({"tool_name": "Bash", "tool_input": {"command": "echo hi"}})
     assert d.action == "fail_open"
+
+
+def test_hook_run_redacts_and_emits_contract(tmp_path):
+    t = _synth_token()
+    env = json.dumps({"session_id": "s1", "tool_name": "Read",
+                      "tool_input": {"file_path": "/x/.env"},
+                      "tool_output": f"BWS_ACCESS_TOKEN={t}\n"})
+    from security_scan.read_guard import hook
+    out = hook.run(env, now="2026-06-17T00:00:00Z")
+    obj = json.loads(out)
+    hso = obj["hookSpecificOutput"]
+    assert hso["hookEventName"] == "PostToolUse"
+    assert t not in hso["updatedToolOutput"]
+    assert "additionalContext" in hso
+
+
+def test_hook_run_passthrough_emits_nothing():
+    from security_scan.read_guard import hook
+    env = json.dumps({"session_id": "s1", "tool_name": "Bash",
+                      "tool_input": {"command": "ls"}, "tool_output": "clean\n"})
+    assert hook.run(env, now="2026-06-17T00:00:00Z") == ""
+
+
+def test_hook_run_passthrough_fidelity_special_chars():
+    from security_scan.read_guard import hook
+    nasty = 'quotes " backslash \\ newline \n tab \t unicode é \x00 end'
+    env = json.dumps({"session_id": "s", "tool_name": "Bash",
+                      "tool_input": {"command": "x"}, "tool_output": nasty})
+    assert hook.run(env, now="2026-06-17T00:00:00Z") == ""  # no rewrite at all
+
+
+def test_hook_run_malformed_input_fail_open():
+    from security_scan.read_guard import hook
+    assert hook.run("not json{", now="2026-06-17T00:00:00Z") == ""
+
+
+def test_audit_log_written_on_redact_no_value(tmp_path, monkeypatch):
+    log = tmp_path / "audit.jsonl"
+    monkeypatch.setenv("READ_GUARD_AUDIT_LOG", str(log))
+    t = _synth_token()
+    env = json.dumps({"session_id": "s1", "tool_name": "Read",
+                      "tool_input": {"file_path": "/x/.env"},
+                      "tool_output": f"{t}\n"})
+    from security_scan.read_guard import hook
+    hook.run(env, now="2026-06-17T00:00:00Z")
+    line = log.read_text().strip()
+    rec = json.loads(line)
+    assert rec["tool"] == "read-guard" and rec["event"] == "redact"
+    assert rec["match_count"] == 1 and t not in line
