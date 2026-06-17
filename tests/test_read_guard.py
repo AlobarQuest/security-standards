@@ -37,3 +37,19 @@ def test_scan_finds_token_in_decoded_output():
 
 def test_scan_returns_empty_for_clean_output():
     assert core.scan_for_bws("totally clean log output\nno secrets here\n") == []
+
+
+def test_redact_replaces_token_preserves_surroundings():
+    t = _synth_token()
+    out = f"prefix [{t}] suffix"
+    red = core.redact(out, [t])
+    assert t not in red
+    assert red == f"prefix [{core.SENTINEL}] suffix"
+
+
+def test_redact_handles_multiple_and_special_chars():
+    a, b = _synth_token(), _synth_token()
+    out = f'line1 "{a}"\n\tline2 \\{b}\\ unicode-é'
+    red = core.redact(out, [a, b])
+    assert a not in red and b not in red
+    assert "unicode-é" in red and "\t" in red and "\\" in red
