@@ -11,10 +11,18 @@ with remediation. Surfaces: a Claude Code skill (`skill/SKILL.md`) and CI (`secu
 
 Design: `docs/superpowers/specs/2026-06-12-security-standards-enforcement-design.md`.
 
-## Read-guard (PREVENT — read side)
+## Read-guard (SHELVED — redact-on-read is infeasible on Claude Code)
 
-A PostToolUse hook (`~/.claude/hooks/bws-read-guard.sh`) runs after every `Read` and `Bash` tool call inside a Claude Code session. It pipes the tool output through `security_scan.read_guard`, which redacts any BWS token (canonical shape `0.<uuid>.<secret>`, defined in `security_scan.token_shapes`) before the output reaches the agent context. This closes the exfiltration path where a token written into a tracked file could be read back and surfaced in a transcript.
+> **Status: shelved / not wired.** The `security_scan.read_guard` package was built to
+> redact a BWS token out of `Read`/`Bash` output via a PostToolUse hook *before it reaches
+> the transcript*. Live validation proved this is **impossible on the installed Claude Code**:
+> a PostToolUse hook cannot modify or suppress tool output (`updatedToolOutput` /
+> `updatedToolResponse` are ignored; `decision:"block"` still delivers the output) — it can
+> only annotate. The token enters the transcript the instant a tool returns. The package is
+> retained, **inert and unwired**, as a reference (and its pure primitives — `scan_for_bws`,
+> `redact`, `token_shapes.BWS_TOKEN_RX` — are reusable). The active read-side protection is
+> **prevention-by-absence**: the BWS tokens were migrated out of plaintext files into the
+> macOS Keychain, so there is little left on disk to read. To keep a secret out of the
+> transcript via hooks you would need a PreToolUse path-deny (coarse, path-based).
 
-Detection uses two signals: content-shape matching (the canonical regex) and a path amplifier (if the file path suggests a `.env` or config file, sensitivity is raised). If the guard process itself fails for any reason, it applies an Option-3 fail-safe: pass the output through unchanged rather than blocking the agent, so a hook crash does not halt work.
-
-Design: `docs/superpowers/specs/2026-06-17-bws-read-guard-design.md`.
+Design (now superseded by the feasibility finding): `docs/superpowers/specs/2026-06-17-bws-read-guard-design.md`.

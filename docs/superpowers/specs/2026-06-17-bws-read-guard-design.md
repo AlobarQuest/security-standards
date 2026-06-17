@@ -1,6 +1,15 @@
 # Design: BWS read-guard (redact-on-read PostToolUse hook)
 
-**Date:** 2026-06-17 · **Owner:** Devon · **Status:** approved design, pre-implementation
+**Date:** 2026-06-17 · **Owner:** Devon · **Status:** SHELVED — core mechanism infeasible
+
+> **SHELVED (2026-06-17).** This design assumes a PostToolUse hook can rewrite tool output
+> (redact a token before it persists). Live validation proved the installed Claude Code does
+> NOT support this — a PostToolUse hook cannot modify or suppress output, only annotate. The
+> redact-on-read mechanism (Approach A throughout this doc) is therefore not buildable here.
+> The package was built + merged (`0d5bd64`) but is inert and unwired. Active read-side
+> protection is prevention-by-absence (the Keychain migration). See the project memory
+> `posttooluse-cannot-redact-output` and the §4 implementation-time-validation note (which is
+> exactly the gate that caught this).
 **Topic:** an agent-scoped guard that keeps a live BWS token from ever landing in the
 Claude Code transcript when a tool *reads* one — the read-side twin of `bws-write-guard.sh`.
 
