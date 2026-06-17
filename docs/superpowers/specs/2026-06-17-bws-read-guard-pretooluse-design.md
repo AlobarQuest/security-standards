@@ -1,6 +1,6 @@
 # Design: BWS read-guard v2 — PreToolUse content-peek + deny (Read tool)
 
-**Date:** 2026-06-17 · **Owner:** Devon · **Status:** approved design, pre-implementation
+**Date:** 2026-06-17 · **Owner:** Devon · **Status:** implemented
 **Supersedes:** `2026-06-17-bws-read-guard-design.md` (the PostToolUse-redact design — SHELVED:
 PostToolUse hooks cannot modify/suppress tool output on this Claude Code; see project memory
 `posttooluse-cannot-redact-output`).
