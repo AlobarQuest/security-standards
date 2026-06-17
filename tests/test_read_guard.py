@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import time as _time
 import uuid
 import pytest
 from security_scan import token_shapes
@@ -161,3 +162,10 @@ def test_audit_log_written_on_redact_no_value(tmp_path, monkeypatch):
     rec = json.loads(line)
     assert rec["tool"] == "read-guard" and rec["event"] == "redact"
     assert rec["match_count"] == 1 and t not in line
+
+
+def test_scan_large_output_is_fast():
+    big = ("x" * 1_000_000 + "\n") * 10  # ~10 MB, no token
+    start = _time.perf_counter()
+    assert core.scan_for_bws(big) == []
+    assert _time.perf_counter() - start < 1.0  # well under any hook timeout
