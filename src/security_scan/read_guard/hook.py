@@ -20,7 +20,8 @@ def run(stdin_text: str, *, now: str) -> str:
         return ""  # fail-open: cannot parse -> allow
     tool = env.get("tool_name")
     sid = env.get("session_id")
-    fp = (env.get("tool_input") or {}).get("file_path")
+    ti = env.get("tool_input")
+    fp = ti.get("file_path") if isinstance(ti, dict) else None
     try:
         d = core.peek_decision(fp)
     except Exception:

@@ -139,3 +139,16 @@ def test_hook_audit_written_on_deny_no_value(tmp_path, monkeypatch):
     line = (tmp_path / "a.jsonl").read_text().strip()
     rec = json.loads(line)
     assert rec["event"] == "deny" and rec["tool"] == "read-guard" and t not in line
+
+
+def test_hook_non_dict_tool_input_fail_open():
+    from security_scan.read_guard import hook
+    for bad in ("weird-string", [1, 2], 42):
+        env = json.dumps({"session_id": "s", "tool_name": "Read", "tool_input": bad})
+        assert hook.run(env, now="2026-06-17T00:00:00Z") == ""
+
+
+def test_hook_missing_tool_input_fail_open():
+    from security_scan.read_guard import hook
+    assert hook.run(json.dumps({"tool_name": "Read"}), now="2026-06-17T00:00:00Z") == ""
+    assert hook.run(json.dumps({"tool_name": "Read", "tool_input": {}}), now="2026-06-17T00:00:00Z") == ""
