@@ -82,3 +82,13 @@ def test_peek_allows_binary_file(tmp_path):
     f = tmp_path / "blob.bin"
     f.write_bytes(b"\x00\x01\x02\xff\xfe" * 10)
     assert core.peek_decision(str(f)).action == "allow"
+
+
+def test_peek_allows_unreadable_file(tmp_path):
+    f = tmp_path / "no_read.txt"
+    f.write_text("harmless")
+    f.chmod(0o000)
+    try:
+        assert core.peek_decision(str(f)).action == "allow"
+    finally:
+        f.chmod(0o644)

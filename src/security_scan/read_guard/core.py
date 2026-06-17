@@ -1,4 +1,4 @@
-"""Pure read-guard logic: BWS token detection. No I/O, no side effects."""
+"""Read-guard logic: BWS token detection and file-content peek. Fail-open."""
 import os
 from dataclasses import dataclass
 
@@ -25,10 +25,10 @@ def peek_decision(file_path: str | None, *, size_cap: int = 262144) -> PeekResul
     try:
         if not os.path.isfile(file_path):
             return PeekResult("allow", file_path)
-        if os.path.getsize(file_path) > size_cap:
-            return PeekResult("allow", file_path)
         with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
+            content = f.read(size_cap + 1)
+        if len(content) > size_cap:
+            return PeekResult("allow", file_path)
     except (OSError, UnicodeDecodeError):
         return PeekResult("allow", file_path)
     matches = scan_for_bws(content)
