@@ -4,6 +4,7 @@ No I/O, no side effects — unit-tested without Claude Code. The hook entry
 (security_scan.read_guard.hook) wraps this with stdin/stdout + audit logging.
 """
 import re as _re
+from dataclasses import dataclass
 from security_scan.token_shapes import BWS_TOKEN_RX
 
 
@@ -49,3 +50,37 @@ def extract_path(envelope: dict):
         if m:
             return cmd[m.start():m.end()]
     return None
+
+
+SUPPRESS_MESSAGE = ("[OUTPUT WITHHELD by read-guard: a BWS token was present and "
+                    "could not be safely redacted. Fetch the value at runtime from "
+                    "Keychain/BWS; do not read the file.]")
+
+
+@dataclass
+class Decision:
+    action: str            # passthrough | redact | suppress | fail_open
+    output: str | None = None
+    match_count: int = 0
+    matched_path: str | None = None
+
+
+def decide(envelope: dict) -> Decision:
+    path = extract_path(envelope)
+    output = envelope.get("tool_output")
+    if not isinstance(output, str):                 # cannot read content
+        if is_secret_path(path):
+            return Decision("suppress", SUPPRESS_MESSAGE, 0, path)
+        return Decision("fail_open", None, 0, path)
+    try:
+        matches = scan_for_bws(output)
+    except Exception:                               # scan blew up
+        if is_secret_path(path):
+            return Decision("suppress", SUPPRESS_MESSAGE, 0, path)
+        return Decision("fail_open", None, 0, path)
+    if not matches:
+        return Decision("passthrough", None, 0, path)
+    try:
+        return Decision("redact", redact(output, matches), len(matches), path)
+    except Exception:
+        return Decision("suppress", SUPPRESS_MESSAGE, 0, path)

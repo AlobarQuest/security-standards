@@ -1,5 +1,6 @@
 import re
 import uuid
+import pytest
 from security_scan import token_shapes
 from security_scan.read_guard import core
 
@@ -76,3 +77,36 @@ def test_extract_path_from_read_and_bash():
     bash = core.extract_path({"tool_name": "Bash",
                               "tool_input": {"command": "cat ~/.config/foo/env"}})
     assert bash is not None and core.is_secret_path(bash) is True
+
+
+def test_decide_passthrough_when_clean():
+    d = core.decide({"tool_name": "Bash", "tool_input": {"command": "ls"},
+                     "tool_output": "file1\nfile2\n"})
+    assert d.action == "passthrough" and d.output is None
+
+
+def test_decide_redacts_when_token_present():
+    t = _synth_token()
+    d = core.decide({"tool_name": "Read", "tool_input": {"file_path": "/x/.env"},
+                     "tool_output": f"BWS_ACCESS_TOKEN={t}\n"})
+    assert d.action == "redact" and t not in d.output and d.match_count == 1
+
+
+def test_decide_suppresses_when_redaction_fails(monkeypatch):
+    t = _synth_token()
+    monkeypatch.setattr(core, "redact",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    d = core.decide({"tool_name": "Read", "tool_input": {"file_path": "/x/.env"},
+                     "tool_output": f"{t}\n"})
+    assert d.action == "suppress" and d.output == core.SUPPRESS_MESSAGE
+
+
+def test_decide_missing_output_secret_path_suppresses():
+    d = core.decide({"tool_name": "Read",
+                     "tool_input": {"file_path": "/x/.config/foo/env"}})
+    assert d.action == "suppress"
+
+
+def test_decide_missing_output_normal_path_fail_open():
+    d = core.decide({"tool_name": "Bash", "tool_input": {"command": "echo hi"}})
+    assert d.action == "fail_open"
