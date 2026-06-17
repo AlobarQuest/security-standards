@@ -6,6 +6,7 @@ missing guard removes protection with no signal. These checks make that loud.
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import uuid
 from dataclasses import dataclass
@@ -90,3 +91,20 @@ def check_canary(shim_path: str = _DEFAULT_SHIM) -> Result:
             os.rmdir(tmpdir)
         except OSError:
             pass
+
+
+def main(argv=None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if "--canary" in argv:
+        r1 = check_presence()
+        r2 = check_canary()
+        print(f"presence: {'OK' if r1.ok else 'FAIL'} - {r1.detail}")
+        print(f"canary:   {'OK' if r2.ok else 'FAIL'} - {r2.detail}")
+        return 0 if (r1.ok and r2.ok) else 1
+    r = check_presence()
+    print(f"presence: {'OK' if r.ok else 'FAIL'} - {r.detail}")
+    return 0 if r.ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

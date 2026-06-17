@@ -116,3 +116,18 @@ def test_canary_does_not_pollute_real_audit_log(tmp_path, monkeypatch):
     selfcheck.check_canary(shim)
     # the canary sets its OWN READ_GUARD_AUDIT_LOG for the subprocess, so the sentinel stays absent
     assert not sentinel.exists()
+
+
+def test_main_presence_exit_codes(monkeypatch, capsys):
+    monkeypatch.setattr(selfcheck, "check_presence", lambda *a, **k: selfcheck.Result(True, "ok"))
+    assert selfcheck.main([]) == 0
+    monkeypatch.setattr(selfcheck, "check_presence", lambda *a, **k: selfcheck.Result(False, "nope"))
+    assert selfcheck.main([]) == 1
+
+
+def test_main_canary_exit_codes(monkeypatch):
+    monkeypatch.setattr(selfcheck, "check_presence", lambda *a, **k: selfcheck.Result(True, "ok"))
+    monkeypatch.setattr(selfcheck, "check_canary", lambda *a, **k: selfcheck.Result(True, "ok"))
+    assert selfcheck.main(["--canary"]) == 0
+    monkeypatch.setattr(selfcheck, "check_canary", lambda *a, **k: selfcheck.Result(False, "broken"))
+    assert selfcheck.main(["--canary"]) == 1  # canary fail -> overall fail
