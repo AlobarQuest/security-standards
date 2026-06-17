@@ -53,3 +53,26 @@ def test_redact_handles_multiple_and_special_chars():
     red = core.redact(out, [a, b])
     assert a not in red and b not in red
     assert "unicode-é" in red and "\t" in red and "\\" in red
+
+
+def test_is_secret_path_true_for_known_secret_files():
+    for p in [
+        "/Users/devon/.config/infra-drift/env",
+        "/home/x/.ssh/id_rsa",
+        "/root/.aws/credentials",
+        "/app/.env",
+    ]:
+        assert core.is_secret_path(p) is True
+
+
+def test_is_secret_path_false_for_normal_files():
+    for p in ["/Users/devon/Projects/foo/main.py", "/tmp/build.log", None]:
+        assert core.is_secret_path(p) is False
+
+
+def test_extract_path_from_read_and_bash():
+    assert core.extract_path({"tool_name": "Read",
+                              "tool_input": {"file_path": "/x/.env"}}) == "/x/.env"
+    bash = core.extract_path({"tool_name": "Bash",
+                              "tool_input": {"command": "cat ~/.config/foo/env"}})
+    assert bash is not None and core.is_secret_path(bash) is True
