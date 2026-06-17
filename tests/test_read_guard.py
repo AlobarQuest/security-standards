@@ -1,3 +1,4 @@
+import json
 import time as _time
 import uuid
 from security_scan import token_shapes
@@ -92,3 +93,49 @@ def test_peek_allows_unreadable_file(tmp_path):
         assert core.peek_decision(str(f)).action == "allow"
     finally:
         f.chmod(0o644)
+
+
+def test_hook_denies_read_of_token_file(tmp_path, monkeypatch):
+    from security_scan.read_guard import hook
+    monkeypatch.setenv("READ_GUARD_AUDIT_LOG", str(tmp_path / "a.jsonl"))
+    t = _synth_token()
+    f = tmp_path / "secret.env"
+    f.write_text(f"BWS_ACCESS_TOKEN={t}\n")
+    env = json.dumps({"session_id": "s", "tool_name": "Read",
+                      "tool_input": {"file_path": str(f)}})
+    out = hook.run(env, now="2026-06-17T00:00:00Z")
+    obj = json.loads(out)["hookSpecificOutput"]
+    assert obj["hookEventName"] == "PreToolUse"
+    assert obj["permissionDecision"] == "deny"
+    assert "Keychain" in obj["permissionDecisionReason"]
+    assert t not in out
+
+
+def test_hook_allows_clean_file(tmp_path, monkeypatch):
+    from security_scan.read_guard import hook
+    monkeypatch.setenv("READ_GUARD_AUDIT_LOG", str(tmp_path / "a.jsonl"))
+    f = tmp_path / "clean.txt"
+    f.write_text("nothing here\n")
+    env = json.dumps({"session_id": "s", "tool_name": "Read",
+                      "tool_input": {"file_path": str(f)}})
+    assert hook.run(env, now="2026-06-17T00:00:00Z") == ""
+
+
+def test_hook_malformed_envelope_fail_open(monkeypatch, tmp_path):
+    from security_scan.read_guard import hook
+    monkeypatch.setenv("READ_GUARD_AUDIT_LOG", str(tmp_path / "a.jsonl"))
+    assert hook.run("not json{", now="2026-06-17T00:00:00Z") == ""
+
+
+def test_hook_audit_written_on_deny_no_value(tmp_path, monkeypatch):
+    from security_scan.read_guard import hook
+    monkeypatch.setenv("READ_GUARD_AUDIT_LOG", str(tmp_path / "a.jsonl"))
+    t = _synth_token()
+    f = tmp_path / "secret.env"
+    f.write_text(f"{t}\n")
+    env = json.dumps({"session_id": "s", "tool_name": "Read",
+                      "tool_input": {"file_path": str(f)}})
+    hook.run(env, now="2026-06-17T00:00:00Z")
+    line = (tmp_path / "a.jsonl").read_text().strip()
+    rec = json.loads(line)
+    assert rec["event"] == "deny" and rec["tool"] == "read-guard" and t not in line
