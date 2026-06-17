@@ -74,6 +74,13 @@ def test_presence_fails_pretooluse_not_list(tmp_path):
     assert r.ok is False  # must not raise
 
 
+def test_presence_fails_top_level_non_dict(tmp_path):
+    p = tmp_path / "settings.json"
+    p.write_text("[1, 2, 3]")  # valid JSON, not an object
+    r = selfcheck.check_presence(str(p), _shim(tmp_path))
+    assert r.ok is False  # must not raise
+
+
 def _src_dir():
     # the repo `src` dir, so a temp shim's subprocess can import security_scan
     return os.path.dirname(os.path.dirname(security_scan.__file__))

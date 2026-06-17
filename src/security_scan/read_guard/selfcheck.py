@@ -29,6 +29,8 @@ def check_presence(settings_path: str = _DEFAULT_SETTINGS,
             settings = json.load(f)
     except (OSError, ValueError) as e:
         return Result(False, f"cannot read settings.json: {e}")
+    if not isinstance(settings, dict):
+        return Result(False, "settings.json is not a JSON object")
     hooks = settings.get("hooks")
     pre = hooks.get("PreToolUse") if isinstance(hooks, dict) else None
     if not isinstance(pre, list):
@@ -56,10 +58,11 @@ def check_canary(shim_path: str = _DEFAULT_SHIM) -> Result:
     to a temp path; cleans up. Any failure/exception -> not-ok."""
     if not os.path.isfile(shim_path):
         return Result(False, f"shim missing: {shim_path}")
-    tmpdir = tempfile.mkdtemp(prefix="rg-canary-")
-    secret = os.path.join(tmpdir, "secret.env")
-    clean = os.path.join(tmpdir, "clean.txt")
+    tmpdir = None
     try:
+        tmpdir = tempfile.mkdtemp(prefix="rg-canary-")
+        secret = os.path.join(tmpdir, "secret.env")
+        clean = os.path.join(tmpdir, "clean.txt")
         token = "0." + str(uuid.uuid4()) + "." + ("A" * 30)  # runtime-built; never a literal
         with open(secret, "w") as f:
             f.write(f"BWS_ACCESS_TOKEN={token}\n")
@@ -82,15 +85,16 @@ def check_canary(shim_path: str = _DEFAULT_SHIM) -> Result:
     except Exception as e:
         return Result(False, f"canary error: {e}")
     finally:
-        for n in ("secret.env", "clean.txt", "audit.jsonl"):
+        if tmpdir:
+            for n in ("secret.env", "clean.txt", "audit.jsonl"):
+                try:
+                    os.remove(os.path.join(tmpdir, n))
+                except OSError:
+                    pass
             try:
-                os.remove(os.path.join(tmpdir, n))
+                os.rmdir(tmpdir)
             except OSError:
                 pass
-        try:
-            os.rmdir(tmpdir)
-        except OSError:
-            pass
 
 
 def main(argv=None) -> int:
