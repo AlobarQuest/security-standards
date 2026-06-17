@@ -36,6 +36,7 @@ def test_presence_fails_read_entry_wrong_command(tmp_path):
     shim = _shim(tmp_path)
     r = selfcheck.check_presence(_settings(tmp_path, "/some/other/cmd"), shim)
     assert r.ok is False
+    assert shim in r.detail
 
 
 def test_presence_fails_shim_missing(tmp_path):
@@ -55,3 +56,17 @@ def test_presence_fails_unparseable_settings(tmp_path):
     p.write_text("not json{")
     r = selfcheck.check_presence(str(p), _shim(tmp_path))
     assert r.ok is False
+
+
+def test_presence_fails_non_dict_hooks(tmp_path):
+    p = tmp_path / "settings.json"
+    p.write_text(json.dumps({"hooks": [1, 2, 3]}))  # hooks is a list, not a dict
+    r = selfcheck.check_presence(str(p), _shim(tmp_path))
+    assert r.ok is False  # must not raise
+
+
+def test_presence_fails_pretooluse_not_list(tmp_path):
+    p = tmp_path / "settings.json"
+    p.write_text(json.dumps({"hooks": {"PreToolUse": "oops"}}))
+    r = selfcheck.check_presence(str(p), _shim(tmp_path))
+    assert r.ok is False  # must not raise

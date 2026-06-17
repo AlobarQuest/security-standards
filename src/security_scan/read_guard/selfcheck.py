@@ -25,7 +25,10 @@ def check_presence(settings_path: str = _DEFAULT_SETTINGS,
             settings = json.load(f)
     except (OSError, ValueError) as e:
         return Result(False, f"cannot read settings.json: {e}")
-    pre = (settings.get("hooks") or {}).get("PreToolUse") or []
+    hooks = settings.get("hooks")
+    pre = hooks.get("PreToolUse") if isinstance(hooks, dict) else None
+    if not isinstance(pre, list):
+        return Result(False, "no PreToolUse hooks list in settings.json")
     entry = next((h for h in pre if isinstance(h, dict) and h.get("matcher") == "Read"), None)
     if entry is None:
         return Result(False, "no PreToolUse 'Read' hook entry in settings.json")
