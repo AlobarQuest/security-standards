@@ -169,3 +169,16 @@ def test_scan_large_output_is_fast():
     start = _time.perf_counter()
     assert core.scan_for_bws(big) == []
     assert _time.perf_counter() - start < 1.0  # well under any hook timeout
+
+
+def test_known_limit_transformed_token_not_caught():
+    # Token reversed before printing is intentionally NOT detected (documented).
+    t = _synth_token()
+    assert core.scan_for_bws(t[::-1]) == []
+
+
+def test_known_limit_token_not_in_output_not_redacted():
+    # Read-and-use-without-printing: nothing in the output, nothing to redact.
+    d = core.decide({"tool_name": "Bash", "tool_input": {"command": "python use.py"},
+                     "tool_output": "done\n"})
+    assert d.action == "passthrough"
