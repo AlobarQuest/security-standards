@@ -13,5 +13,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e .
+      - name: Install test deps
+        run: pip install -e ".[dev]"
+      - name: Read-guard tests
+        run: python -m pytest tests/test_read_guard.py -v
       - name: Security scan (fails on BLOCK)
         run: python -m security_scan.cli . --category security
