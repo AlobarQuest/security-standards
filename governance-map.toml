@@ -72,7 +72,48 @@ class = "tool-home"
 lane = "approve"
 owns = ["change-manager FastAPI service"]
 
-# Consumer repos are appended in Task 10.
+# Consumer build agents (registered in Task 10). BWS-consuming repos.
+[[repo]]
+name = "Contacts"
+path = "~/Projects/Contacts"
+class = "consumer"
+uses_bws = true
+
+[[repo]]
+name = "FacelessTT"
+path = "~/Projects/FacelessTT"
+class = "consumer"
+uses_bws = true
+
+[[repo]]
+name = "imap-mcp-server"
+path = "~/Projects/imap-mcp-server"
+class = "consumer"
+uses_bws = true
+
+[[repo]]
+name = "InfraManager"
+path = "~/Projects/InfraManager"
+class = "consumer"
+uses_bws = true
+
+[[repo]]
+name = "rental-investment-calculator"
+path = "~/Projects/rental-investment-calculator"
+class = "consumer"
+uses_bws = true
+
+[[repo]]
+name = "VideoCreator"
+path = "~/Projects/VideoCreator"
+class = "consumer"
+uses_bws = true
+
+[[repo]]
+name = "vps-backup"
+path = "~/Projects/vps-backup"
+class = "consumer"
+uses_bws = true
 
 # ───────────────────── Runtime state (deliberately repo-less) ─────────────────────
 [[runtime_dir]]
