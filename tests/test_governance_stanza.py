@@ -91,3 +91,28 @@ def test_ensure_bws_manifest(tmp_path):
     nob_dir.mkdir()
     nob = Repo(name="N", path=str(nob_dir), cls="consumer", uses_bws=False)
     assert ensure_bws_manifest(nob) == "skip"
+
+
+from security_scan.governance.__main__ import main as gov_main
+
+
+def test_cli_sync_then_full_verify(tmp_path, capsys):
+    repo_root = tmp_path / "FacelessTT"
+    repo_root.mkdir()
+    (repo_root / "CLAUDE.md").write_text("# FacelessTT\n")
+    toml = tmp_path / "g.toml"
+    toml.write_text(f'''
+[[repo]]
+name = "FacelessTT"
+path = "{repo_root}"
+class = "consumer"
+uses_bws = true
+''')
+    assert gov_main(["sync", "--map", str(toml)]) == 0
+    assert START in (repo_root / "CLAUDE.md").read_text()
+    assert (repo_root / ".bws-secrets.toml").exists()
+    assert gov_main(["verify", "--map", str(toml)]) == 0
+    # tamper → full verify fails
+    (repo_root / "CLAUDE.md").write_text("# wiped\n")
+    assert gov_main(["verify", "--map", str(toml)]) == 1
+    assert "stanza" in capsys.readouterr().out

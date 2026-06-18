@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .loader import load_map
 from .deploy import deploy_artifacts, verify_artifacts
+from .stanza import sync_stanza, verify_stanza, ensure_bws_manifest
 
 DEFAULT_MAP = Path(__file__).resolve().parents[3] / "governance-map.toml"
 
@@ -25,16 +26,23 @@ def main(argv=None) -> int:
 
     if args.command == "verify":
         problems = [f"artifact {kind}: {name}" for name, kind in verify_artifacts(manifest)]
-        # Stanza verification is added in Task 9; --artifacts-only is the Phase-1 behavior.
+        if not args.artifacts_only:
+            for r in manifest.repos:
+                v = verify_stanza(r, manifest)
+                if v != "ok":
+                    problems.append(f"stanza {v}: {r.name}")
         if problems:
             print("\n".join(problems))
             return 1
-        print("governance verify: artifacts in sync")
+        scope = "artifacts" if args.artifacts_only else "artifacts + stanzas"
+        print(f"governance verify: {scope} in sync")
         return 0
 
     if args.command == "sync":
-        print("sync not yet implemented (Task 9)")
-        return 2
+        for r in manifest.repos:
+            print(f"{sync_stanza(r, manifest)}: {r.name}/CLAUDE.md")
+            print(f"{ensure_bws_manifest(r)}: {r.name}/.bws-secrets.toml")
+        return 0
 
     return 2
 
