@@ -40,7 +40,7 @@ def test_block_is_wrapped_in_markers():
 
 
 from security_scan.governance.stanza import (
-    sync_stanza, verify_stanza, ensure_bws_manifest, block,
+    sync_stanza, verify_stanza, ensure_bws_manifest,
 )
 
 

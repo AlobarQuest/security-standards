@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from .loader import Manifest, Repo
 
 START = "<!-- governance:start -->"
@@ -43,9 +46,6 @@ def render_stanza(repo: Repo, manifest: Manifest) -> str:
 def block(repo: Repo, manifest: Manifest) -> str:
     return f"{START}\n{render_stanza(repo, manifest)}{END}\n"
 
-
-import os
-from pathlib import Path
 
 _BWS_SKELETON = (
     "# .bws-secrets.toml — BWS secret UUIDs this repo consumes (NEVER token values).\n"
