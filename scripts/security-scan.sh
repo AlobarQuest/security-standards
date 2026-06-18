@@ -260,6 +260,19 @@ if have git && [ -d "$CP/.git" ]; then
 else
   emit FAIL controlplane.unmanaged "$CP is not a git repo — control-plane tamper-evidence inactive (run: git -C $CP init)"
 fi
+
+# ---------------------------------------------------------------------------
+# 14. Deployed artifacts in sync with home repos (governance-map)
+# ---------------------------------------------------------------------------
+# ── Check: deployed artifacts match their home repos (governance-map) ──
+SECSTD="$HOME/Projects/security-standards"
+if [ -f "$SECSTD/governance-map.toml" ] && have python3; then
+  if gv_out="$(cd "$SECSTD" && PYTHONPATH=src python3 -m security_scan.governance verify --artifacts-only 2>&1)"; then
+    emit PASS governance.artifacts_in_sync "deployed artifacts match home repos"
+  else
+    emit FAIL governance.artifacts_in_sync "$(printf '%s' "$gv_out" | tr '\n' ';')"
+  fi
+fi
 # ---------------------------------------------------------------------------
 echo "=== summary: PASS=$PASS WARN=$WARN FAIL=$FAIL ===" | tee -a "$LOG"
 [ "$FAIL" -gt 0 ] && { echo "DRIFT DETECTED ($FAIL fail)"; exit 1; }
