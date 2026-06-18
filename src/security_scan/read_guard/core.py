@@ -1,4 +1,11 @@
 """Read-guard logic: BWS token detection and file-content peek. Fail-open."""
+# Deferred annotations: this module is executed by the ambient `python3` of the
+# Claude Code hook environment (system Python 3.9 under launchd), below the 3.12
+# dev floor. `from __future__ import annotations` keeps PEP 604 `X | None`
+# annotations from being evaluated at import, so the guard never crashes (and
+# silently fails open) on an older interpreter. See test_read_guard_py39_compat.
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
 
