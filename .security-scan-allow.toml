@@ -61,3 +61,15 @@ reason = "TDD fixture/example token committed during the scanner's own developme
 rule = "bws.no-token-in-git-history"
 evidence = "pattern present in git history (commit 8e37a6c381de)"
 reason = "TDD fixture/example token committed during the scanner's own development."
+
+# The repatriated BWS write-guard hook embeds the bootstrap-token shape in a descriptive
+# comment (line 31) and in its own detection PATTERN (line 32) — detecting that shape IS
+# the hook's job. No real credential is present; the deployed copy is byte-identical and
+# is not scanned by this repo. The hook must stay verbatim, so exempt this one
+# self-referential match. A real inline assignment in any other file still BLOCKs, and if
+# the matched length changes this entry fails closed and forces re-review.
+[[allow]]
+rule = "bws.bootstrap-token-not-inline"
+file = "hooks/bws-write-guard.sh"
+evidence = "BWS_ACCE…(len 21)"
+reason = "Hook's own detection pattern plus its descriptive comment; not a real credential. Imported verbatim from the deployed guard."
