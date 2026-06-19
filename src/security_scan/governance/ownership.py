@@ -198,3 +198,23 @@ def verify_headers(manifest: Manifest) -> list[tuple[str, str]]:
             continue
         problems.append((t.name, "wrong" if "# Source of truth:" in text else "missing"))
     return problems
+
+
+def strip_stanza(repo: Repo) -> str:
+    path = _claude_md(repo)
+    if not path.exists():
+        return "missing"
+    text = path.read_text()
+    if START not in text or END not in text:
+        return "absent"
+    s = text.index(START)
+    e = text.index(END) + len(END)
+    before = text[:s].rstrip()
+    after = text[e:].lstrip()
+    if before and after:
+        result = before + "\n\n" + after
+    else:
+        result = before or after
+    result = (result.rstrip() + "\n") if result.strip() else ""
+    path.write_text(result)
+    return "stripped"

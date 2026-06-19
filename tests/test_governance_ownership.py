@@ -1,5 +1,5 @@
 from security_scan.governance.loader import Manifest, Repo
-from security_scan.governance.ownership import render_stanza, block, START, END
+from security_scan.governance.ownership import render_stanza, block, START, END, strip_stanza
 
 TOOLHOME = Repo(name="infraops-mcp-server", path="~/Projects/infraops-mcp-server",
                 cls="tool-home", lane="mutate",
@@ -212,3 +212,32 @@ def test_verify_headers_flags_wrong_when_stale_header(tmp_path):
     p = (tmp_path / "home" / "scripts" / "a.sh")
     p.write_text("#!/bin/bash\n# Source of truth: WRONG/path (deployed → nope)\necho a\n")
     assert verify_headers(m) == [("a.sh", "wrong")]
+
+
+def test_strip_removes_block_preserves_surrounding(tmp_path):
+    d = tmp_path / "repo"
+    d.mkdir()
+    cm = d / "CLAUDE.md"
+    cm.write_text(f"# Title\n\nIntro.\n\n{START}\nGENERATED\n{END}\n\nTail.\n")
+    repo = Repo(name="R", path=str(d), cls="consumer")
+    assert strip_stanza(repo) == "stripped"
+    text = cm.read_text()
+    assert "GENERATED" not in text and START not in text and END not in text
+    assert "Intro." in text and "Tail." in text
+    # idempotent
+    assert strip_stanza(repo) == "absent"
+
+
+def test_strip_block_at_end(tmp_path):
+    d = tmp_path / "repo"
+    d.mkdir()
+    cm = d / "CLAUDE.md"
+    cm.write_text(f"# Title\n\nBody.\n\n{START}\nX\n{END}\n")
+    repo = Repo(name="R", path=str(d), cls="consumer")
+    assert strip_stanza(repo) == "stripped"
+    assert cm.read_text() == "# Title\n\nBody.\n"
+
+
+def test_strip_missing_claude_md(tmp_path):
+    repo = Repo(name="R", path=str(tmp_path / "nope"), cls="consumer")
+    assert strip_stanza(repo) == "missing"
