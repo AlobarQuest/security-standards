@@ -1,94 +1,11 @@
 from security_scan.governance.loader import Manifest, Repo
-from security_scan.governance.ownership import render_stanza, block, START, END, strip_stanza
-
-TOOLHOME = Repo(name="infraops-mcp-server", path="~/Projects/infraops-mcp-server",
-                cls="tool-home", lane="mutate",
-                owns=["drift-audit.sh", "change-window.sh"],
-                consumers=["FacelessTT"])
-CONSUMER = Repo(name="FacelessTT", path="~/Projects/FacelessTT",
-                cls="consumer", uses_bws=True)
-M = Manifest(tools=[], repos=[TOOLHOME, CONSUMER], runtime_dirs=[])
-
-
-def test_toolhome_stanza_mentions_ownership_and_lane():
-    s = render_stanza(TOOLHOME, M)
-    assert "tool-home" in s
-    assert "mutate" in s
-    assert "`drift-audit.sh`" in s
-    assert "make install" in s and "make verify" in s
-    assert "FacelessTT" in s
-
-
-def test_toolhome_stanza_states_honest_gating_scope():
-    # The "approve" lane oversells the interactive threat model unless the stanza
-    # is explicit that only the autonomous path is approval-gated (review item #2).
-    s = render_stanza(TOOLHOME, M)
-    assert "autonomous" in s.lower()
-    assert "interactive" in s.lower()
-    assert "guardrail-gated" in s.lower()
-
-
-def test_consumer_stanza_mentions_enforcement_and_bws():
-    s = render_stanza(CONSUMER, M)
-    assert "consumer" in s
-    assert "security-standards" in s
-    assert "bws-write-guard" in s
-    assert ".bws-secrets.toml" in s
-
-
-def test_consumer_without_bws_omits_manifest_line():
-    nobws = Repo(name="X", path="~/X", cls="consumer", uses_bws=False)
-    s = render_stanza(nobws, M)
-    assert ".bws-secrets.toml" not in s
-
-
-def test_block_is_wrapped_in_markers():
-    b = block(CONSUMER, M)
-    assert b.startswith(START)
-    assert b.rstrip().endswith(END)
-
-
-from security_scan.governance.ownership import (
-    sync_stanza, verify_stanza, ensure_bws_manifest,
-)
+from security_scan.governance.ownership import START, END, strip_stanza, ensure_bws_manifest
 
 
 def _repo_at(tmp_path, uses_bws=True):
     d = tmp_path / "repo"
     d.mkdir()
     return Repo(name="FacelessTT", path=str(d), cls="consumer", uses_bws=uses_bws), d
-
-
-def test_sync_creates_then_is_idempotent(tmp_path):
-    repo, d = _repo_at(tmp_path)
-    m = Manifest(tools=[], repos=[repo], runtime_dirs=[])
-    (d / "CLAUDE.md").write_text("# FacelessTT\n\nExisting notes.\n")
-    assert sync_stanza(repo, m) == "created"
-    assert START in (d / "CLAUDE.md").read_text()
-    assert "Existing notes." in (d / "CLAUDE.md").read_text()
-    assert sync_stanza(repo, m) == "unchanged"
-
-
-def test_sync_updates_stale_block_in_place(tmp_path):
-    repo, d = _repo_at(tmp_path)
-    m = Manifest(tools=[], repos=[repo], runtime_dirs=[])
-    (d / "CLAUDE.md").write_text(f"# T\n\n{START}\nOLD\n{END}\n\nTail.\n")
-    assert sync_stanza(repo, m) == "written"
-    text = (d / "CLAUDE.md").read_text()
-    assert "OLD" not in text
-    assert "Tail." in text
-    assert verify_stanza(repo, m) == "ok"
-
-
-def test_verify_reports_missing_and_drift(tmp_path):
-    repo, d = _repo_at(tmp_path)
-    m = Manifest(tools=[], repos=[repo], runtime_dirs=[])
-    assert verify_stanza(repo, m) == "missing"
-    sync_stanza(repo, m)
-    assert verify_stanza(repo, m) == "ok"
-    cur = (d / "CLAUDE.md").read_text().replace("consumer", "TAMPERED")
-    (d / "CLAUDE.md").write_text(cur)
-    assert verify_stanza(repo, m) == "drift"
 
 
 def test_ensure_bws_manifest(tmp_path):
@@ -103,30 +20,6 @@ def test_ensure_bws_manifest(tmp_path):
 
 
 from security_scan.governance.__main__ import main as gov_main
-
-
-def test_cli_sync_then_full_verify(tmp_path, capsys):
-    repo_root = tmp_path / "FacelessTT"
-    repo_root.mkdir()
-    (repo_root / "CLAUDE.md").write_text("# FacelessTT\n")
-    toml = tmp_path / "g.toml"
-    toml.write_text(f'''
-[[repo]]
-name = "FacelessTT"
-path = "{repo_root}"
-class = "consumer"
-uses_bws = true
-''')
-    assert gov_main(["sync", "--map", str(toml)]) == 0
-    assert START in (repo_root / "CLAUDE.md").read_text()
-    assert (repo_root / ".bws-secrets.toml").exists()
-    assert gov_main(["verify", "--map", str(toml)]) == 0
-    # tamper → full verify fails
-    (repo_root / "CLAUDE.md").write_text("# wiped\n")
-    assert gov_main(["verify", "--map", str(toml)]) == 1
-    assert "stanza" in capsys.readouterr().out
-
-
 from security_scan.governance.ownership import (
     render_ownership, write_ownership, verify_ownership,
 )
@@ -208,7 +101,6 @@ def test_verify_headers_flags_missing(tmp_path):
 
 def test_verify_headers_flags_wrong_when_stale_header(tmp_path):
     m = _hdr_manifest(tmp_path, with_header=False)
-    src = next(iter([m.tools[0]]))
     p = (tmp_path / "home" / "scripts" / "a.sh")
     p.write_text("#!/bin/bash\n# Source of truth: WRONG/path (deployed → nope)\necho a\n")
     assert verify_headers(m) == [("a.sh", "wrong")]
@@ -241,3 +133,59 @@ def test_strip_block_at_end(tmp_path):
 def test_strip_missing_claude_md(tmp_path):
     repo = Repo(name="R", path=str(tmp_path / "nope"), cls="consumer")
     assert strip_stanza(repo) == "missing"
+
+
+# ─────────────────────── CLI tests ───────────────────────
+
+def _cli_map(tmp_path, with_header=True):
+    home = tmp_path / "home"
+    (home / "scripts").mkdir(parents=True)
+    target = tmp_path / "out" / "t.sh"
+    tool_src = home / "scripts" / "t.sh"
+    toml = tmp_path / "g.toml"
+    toml.write_text(f'''
+[[tool]]
+name = "t.sh"
+lane = "detect"
+home_repo = "home"
+source = "scripts/t.sh"
+artifact_class = "deployed"
+deploy_target = "{target}"
+mode = "755"
+
+[[repo]]
+name = "home"
+path = "{home}"
+class = "tool-home"
+''')
+    hdr = (f"# Source of truth: {home}/scripts/t.sh (deployed → {target})\n"
+           "# Edit here, not in place; then: cd ~/Projects/security-standards && make install\n"
+           ) if with_header else ""
+    tool_src.write_text("#!/bin/bash\n" + hdr + "echo x\n")
+    return toml, target
+
+
+def test_cli_ownership_then_full_verify(tmp_path, capsys):
+    toml, target = _cli_map(tmp_path)
+    own = tmp_path / "OWNERSHIP.md"
+    assert gov_main(["deploy", "--map", str(toml)]) == 0
+    assert gov_main(["ownership", "--map", str(toml), "--ownership-path", str(own)]) == 0
+    assert own.exists()
+    assert gov_main(["verify", "--map", str(toml), "--ownership-path", str(own)]) == 0
+
+
+def test_cli_verify_fails_on_missing_header(tmp_path, capsys):
+    toml, target = _cli_map(tmp_path, with_header=False)
+    gov_main(["deploy", "--map", str(toml)])
+    assert gov_main(["verify", "--artifacts-only", "--map", str(toml)]) == 1
+    assert "header" in capsys.readouterr().out
+
+
+def test_cli_strip_stanzas(tmp_path, capsys):
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "CLAUDE.md").write_text(f"# H\n\n{START}\nX\n{END}\n")
+    toml = tmp_path / "g.toml"
+    toml.write_text(f'[[repo]]\nname = "home"\npath = "{home}"\nclass = "tool-home"\n')
+    assert gov_main(["strip-stanzas", "--map", str(toml)]) == 0
+    assert START not in (home / "CLAUDE.md").read_text()

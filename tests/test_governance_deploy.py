@@ -46,8 +46,11 @@ def test_verify_detects_drift_and_missing(tmp_path):
 def test_cli_deploy_then_verify(tmp_path, capsys):
     repo_root = tmp_path / "home"
     (repo_root / "scripts").mkdir(parents=True)
-    (repo_root / "scripts" / "t.sh").write_text("x\n")
     target = tmp_path / "out" / "t.sh"
+    (repo_root / "scripts" / "t.sh").write_text(
+        f"#!/bin/bash\n# Source of truth: {repo_root}/scripts/t.sh (deployed → {target})\n"
+        "# Edit here, not in place; then: cd ~/Projects/security-standards && make install\nx\n"
+    )
     toml = tmp_path / "g.toml"
     toml.write_text(f'''
 [[tool]]
