@@ -125,3 +125,48 @@ uses_bws = true
     (repo_root / "CLAUDE.md").write_text("# wiped\n")
     assert gov_main(["verify", "--map", str(toml)]) == 1
     assert "stanza" in capsys.readouterr().out
+
+
+from security_scan.governance.ownership import (
+    render_ownership, write_ownership, verify_ownership,
+)
+from security_scan.governance.loader import Tool
+
+
+def _own_manifest():
+    tool = Tool(name="security-scan.sh", lane="detect", home_repo="security-standards",
+                source="scripts/security-scan.sh", artifact_class="deployed",
+                deploy_target="~/.claude/bin/security-scan.sh", mode="755")
+    th = Repo(name="security-standards", path="~/Projects/security-standards",
+              cls="tool-home", lane="detect", owns=["security-scan.sh"])
+    cons = Repo(name="FacelessTT", path="~/Projects/FacelessTT", cls="consumer", uses_bws=True)
+    return Manifest(tools=[tool], repos=[th, cons], runtime_dirs=[])
+
+
+def test_render_ownership_has_artifact_lane_and_gating():
+    s = render_ownership(_own_manifest())
+    assert "security-scan.sh" in s
+    assert "~/.claude/bin/security-scan.sh" in s
+    assert "~/Projects/security-standards/scripts/security-scan.sh" in s
+    # honest-gating note migrated from item #2
+    assert "autonomous" in s.lower() and "interactive" in s.lower()
+    assert "guardrail-gated" in s.lower()
+    # repos surfaced
+    assert "security-standards" in s and "FacelessTT" in s
+
+
+def test_write_ownership_idempotent(tmp_path):
+    m = _own_manifest()
+    p = tmp_path / "OWNERSHIP.md"
+    assert write_ownership(m, p) == "written"
+    assert write_ownership(m, p) == "unchanged"
+
+
+def test_verify_ownership_missing_then_ok_then_drift(tmp_path):
+    m = _own_manifest()
+    p = tmp_path / "OWNERSHIP.md"
+    assert verify_ownership(m, p) == "missing"
+    write_ownership(m, p)
+    assert verify_ownership(m, p) == "ok"
+    p.write_text(p.read_text() + "tamper\n")
+    assert verify_ownership(m, p) == "drift"
