@@ -16,23 +16,43 @@ The **repo split (detect/mutate/approve) is sound and worth keeping.** The **`go
 
 ## Action backlog (priority order)
 
-### [ ] 1. 🔴 FATAL (cheap) — make `make install` reconcile the Check-13 tamper baseline
+### [x] 1. 🔴 FATAL (cheap) — make `make install` reconcile the Check-13 tamper baseline
+**Status (2026-06-19):** Prong 1 DONE — `make install` now auto-commits the deployed control-plane
+hooks into the `~/.claude` repo (`deploy.py:reconcile_control_plane`), so a legit deploy is silent to
+Check 13 and out-of-band edits still alert. Verified end-to-end (Check 13 `controlplane.clean`,
+idempotent no-op on unchanged deploy, commits only the exact deployed paths). Prong 2 (the bin/
+scanner's `selfcheck.runner_integrity`, which is infraops-owned and self-healing/one-shot) is handed
+off in `docs/2026-06-19-prong2-selfcheck-runner-integrity-handoff.md`.
 **Problem:** every legit `make install` mutates `~/.claude/{bin,hooks}` → Check 13 fires "control-plane drift → URGENT" → operator learns to reflex-dismiss it → a *real* tamper looks identical and gets dismissed. The deploy process trains you to ignore the signal tamper-evidence relies on. (The 4am executor has a plan-hash "expected-state" gate; Check 13 has no equivalent.)
 **Fix:** make the **last step of `make install` reconcile the control-plane baseline** — auto-commit the deploy diff in the `~/.claude` repo (and/or record the new expected hash, mirroring the existing `self-check.ts` runner-integrity pattern) — so a legitimate deploy is **silent** and only an *out-of-band* change alerts. This also removes the "must remember to commit after install" procedural gap.
 **Where:** `security_scan/governance/deploy.py` (make install) + the Check-13/self-check baseline. Possibly a small touch in infraops `src/security-drift/self-check.ts`.
 **Leverage:** highest on the board — the difference between real and theatrical tamper-evidence.
 
-### [ ] 2. 🟠 Honesty — "approve" gates the autonomous path, NOT live sessions
+### [x] 2. 🟠 Honesty — "approve" gates the autonomous path, NOT live sessions
+**Status (2026-06-19):** DONE. The honest gating model is now stated at the source of truth
+(`governance-map.toml` header: autonomous = approval-gated; interactive = guardrail-gated via
+`permissions.deny` + high-power-gate hook + audit log) and projected into every tool-home stanza
+(`stanza.py` "**Gating scope:**" line). `make sync` regenerated the 3 tool-home stanzas;
+`make verify` green. (infraops + change-manager CLAUDE.md now have uncommitted stanza updates.)
 **Problem:** the "approve" lane creates the impression that mutations are gated. change-manager gates the **autonomous 4am executor only**. A live interactive Claude session still has un-gated access to ~213 infraops mutation tools (controlled only by `permissions.deny` + the high-power-gate hook + response redaction). The lane name oversells the interactive-session threat model.
 **Fix:** state this explicitly in the governance doc / `governance-map.toml` comments — autonomous mutations are *approval-gated*; interactive mutations are *guardrail-gated*. Don't let the model create false confidence. (No code change required — this is a correctness-of-belief fix.)
 **Where:** `governance-map.toml` header / the governance stanza copy.
 
-### [ ] 3. 🟠 Scanner↔parser version skew = silent 3am failure
+### [~] 3. 🟠 Scanner↔parser version skew = silent 3am failure
+**Status (2026-06-19):** PARTIAL. security-standards half DONE — `scripts/security-scan.sh` now
+carries a machine-readable `# SCANNER_OUTPUT_VERSION=1` marker inside a documented `OUTPUT CONTRACT`
+block (a bash comment; not emitted to stdout, so it's inert until read — verified scanner output
+unchanged). The fail-loud assertion is the infraops half and is captured as a **deferred** handoff
+in `docs/2026-06-19-item3-scanner-output-version-infraops-handoff.md` (do AFTER prong 2 of #1 —
+both read the deployed scanner). Item #3 is not protective until that assertion ships.
 **Problem:** infraops `scan-parser.ts` parses `security-scan.sh`'s output by **implicit contract**. A `make install` that changes the scanner's output format silently breaks the parser at **runtime** — the 3am drift job quietly produces zero findings and nothing tells you.
 **Fix:** add a `# SCANNER_OUTPUT_VERSION=N` line to `security-scan.sh` and a matching assertion in infraops `paths.ts` (or the runner) so a mismatch fails loud immediately.
 **Where:** `scripts/security-scan.sh` (here) + infraops `src/security-drift/paths.ts` (tail).
 
 ### [ ] 4. 🟡 Slim the stanza projection — keep the goal, drop the mechanism
+**Status (2026-06-19):** designed + planned. Spec:
+`docs/superpowers/specs/2026-06-19-slim-stanza-projection-design.md`.
+Plan: docs/superpowers/plans/2026-06-19-slim-stanza-projection.md
 **Problem:** generating a `<!-- governance:start/end -->` section into ~10 repos' CLAUDE.md has no enforcement that stanza == reality (only stanza == TOML). It will drift: a hand-edited stanza, a `make sync` not re-run, a forgotten new repo. Stale generated governance docs have *false authority* and will mislead build-agents. It's enterprise coordination machinery on a solo codebase.
 **Important:** the *goal* — agent-legible ownership so a fresh session doesn't re-litigate "where does this live" — is **good** (it's the exact pain that motivated the realignment). Keep the goal; replace the mechanism.
 **Fix:**

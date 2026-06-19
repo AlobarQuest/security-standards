@@ -7,6 +7,18 @@
 #
 # NOTE: a large FAIL baseline is EXPECTED until the audit cutover is applied.
 ###############################################################################
+# OUTPUT CONTRACT (consumed by infraops src/security-drift/scan-parser.ts):
+#   One finding per line:  printf '%-4s %-32s %s\n'  SEV  CHECK  detail
+#     SEV     in {FAIL,WARN,PASS}
+#     CHECK   dotted key, no spaces (e.g. credfile.over_permissive)
+#     detail  free text; the path-bearing forms the parser keys on are:
+#               "<path> (mode NNN) ..."  |  "<file>: <rest>"  |  leading "<path>"
+#   Non-matching lines (the banner, "=== summary ===") are ignored by the parser.
+# Bump SCANNER_OUTPUT_VERSION whenever the line shape OR a detail form above
+# changes, so the infraops parser fails LOUD on skew instead of silently parsing
+# zero findings at 3am. The infraops side reads this marker from the deployed file.
+# SCANNER_OUTPUT_VERSION=1
+###############################################################################
 set -uo pipefail   # deliberately NOT -e: run every check, don't abort early
 
 # launchd hands cron-style jobs a minimal PATH that omits ~/.cargo/bin (where rtk

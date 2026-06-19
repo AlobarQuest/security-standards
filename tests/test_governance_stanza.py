@@ -19,6 +19,15 @@ def test_toolhome_stanza_mentions_ownership_and_lane():
     assert "FacelessTT" in s
 
 
+def test_toolhome_stanza_states_honest_gating_scope():
+    # The "approve" lane oversells the interactive threat model unless the stanza
+    # is explicit that only the autonomous path is approval-gated (review item #2).
+    s = render_stanza(TOOLHOME, M)
+    assert "autonomous" in s.lower()
+    assert "interactive" in s.lower()
+    assert "guardrail-gated" in s.lower()
+
+
 def test_consumer_stanza_mentions_enforcement_and_bws():
     s = render_stanza(CONSUMER, M)
     assert "consumer" in s

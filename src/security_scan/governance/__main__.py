@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from .loader import load_map
-from .deploy import deploy_artifacts, verify_artifacts
+from .deploy import deploy_artifacts, reconcile_control_plane, verify_artifacts
 from .stanza import sync_stanza, verify_stanza, ensure_bws_manifest
 
 DEFAULT_MAP = Path(__file__).resolve().parents[3] / "governance-map.toml"
@@ -22,6 +22,11 @@ def main(argv=None) -> int:
     if args.command == "deploy":
         for name, act in deploy_artifacts(manifest):
             print(f"{act}: {name}")
+        # Reconcile the control-plane git baseline so a legit deploy is silent to
+        # the Check-13 tamper-evidence scan (and closes the "remember to commit
+        # after install" gap). Commits only the deployed paths; never sweeps.
+        for root, note in reconcile_control_plane(manifest):
+            print(f"{note}: {root}")
         return 0
 
     if args.command == "verify":

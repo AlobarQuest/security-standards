@@ -1,5 +1,14 @@
 # governance-map.toml — single source of truth for tool ownership + build-agent alignment.
 # Lane rule: security-standards DETECTS, infraops-mcp-server MUTATES, change-manager APPROVES.
+#
+# Gating scope (be honest — this lane model must not create false confidence):
+#   change-manager's APPROVE lane gates the AUTONOMOUS path ONLY — the 4am security-drift
+#   executor, which is plan-hash-gated through change-manager before it applies anything.
+#   A live INTERACTIVE Claude session is NOT approval-gated: it reaches the infraops mutation
+#   tools directly, contained only by guardrails — permissions.deny (catastrophic commands),
+#   the high-power-gate hook, and the high-power-actions audit log.
+#   In one line: autonomous mutations are APPROVAL-gated; interactive mutations are GUARDRAIL-gated.
+#
 # Projected into: deploys (make install), CLAUDE.md stanzas (make sync), verification (make verify).
 # Edit here; never hand-edit a generated <!-- governance --> stanza.
 

@@ -23,6 +23,10 @@ def render_stanza(repo: Repo, manifest: Manifest) -> str:
         lines += [
             "**Build-agent class:** tool-home — you open this repo to *develop* its tools.",
             f"**Lane:** {repo.lane} (detect / mutate / approve).",
+            "**Gating scope:** *approve* (change-manager) gates the **autonomous** 4am drift "
+            "executor only; an **interactive** session reaches infraops mutation tools directly — "
+            "guardrail-gated (`permissions.deny` + high-power-gate hook + audit log), not "
+            "approval-gated.",
             f"**Owns:** {owned}.",
             "**Deploy:** `make install`  •  **Verify:** `make verify`.",
             f"**Consumers:** {cons}.",
