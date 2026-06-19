@@ -204,7 +204,7 @@ flowchart TB
 | infraops → security-standards repo | read-guard canary + deployed-vs-**blessed-source** compare | → infraops | infraops depends on the repo present at its path |
 | infraops → change-manager (`/api/sync`) | drift findings posted | egress | the autonomous lane handoff (to the **deployed** CM service) |
 | change-manager → infraops executor | approved plan, gated by plan-hash | → infraops | the approval gate — **autonomous path only** |
-| infraops executor → real infra | applies approved fixes | egress | the only automated mutation path |
+| infraops executor → real infra | applies approved fixes | egress | the **4am** approved-plan apply; the **3am** drift job also auto-fixes a narrow allowlisted set directly |
 | infraops ↔ runtime state | baselines · hashes · audit log (0600) | both | repo-less machine state the gate depends on |
 | consumer repos → BWS | runtime secret fetch by UUID | egress | secrets never live in a repo |
 | consumer repos ← guards | subjects of enforcement (declare `.bws-secrets.toml`) | ingress | "governed" — they consume the posture, don't produce it |
@@ -217,12 +217,22 @@ must get a plan approved by *change-manager* first → while *consumer repos* ar
 the deployed guards and pull their secrets from *BWS* — and *GitHub* access control underwrites the
 trust of every source.
 
-## The autonomous pathway (the 4am job)
+## The autonomous pathway (two scheduled jobs)
 
-A scheduled `security-drift` run: **scan → classify (deny-by-default taxonomy) → auto-fix a narrow,
-safe, reversible set → post everything else to change-manager for approval → email only NEW urgent
-items.** Anything unrecognized is treated as URGENT/manual, never auto-applied. The executor is
-gated on a plan-hash so it can only apply the exact plan that was approved.
+Autonomous mutation happens in **two** distinct scheduled passes, gated differently:
+
+- **3am — the drift job** (`drift-audit.sh`, `com.devon.infra-drift` @ 03:00): a `security-drift`
+  run **scans → classifies (deny-by-default taxonomy) → auto-fixes a narrow, safe, reversible set
+  (chmod on an allowlist, held by runtime symlink/owner guards) → posts everything else to
+  change-manager for approval → emails only NEW urgent items.** Anything unrecognized is treated as
+  URGENT/manual, never auto-applied.
+- **4am — the executor** (`change-window.sh`, `com.devon.change-window` @ 04:00): applies the plans
+  change-manager **approved** from a prior run, **verbatim** (no LLM), gated on a **plan-hash** so it
+  can only apply the exact plan that was approved — any mismatch refuses and alerts.
+
+So there are **two automated mutation moments with different gates**: the 3am narrow auto-fix
+(deny-by-default allowlist + runtime guards) and the 4am approved-plan apply (plan-hash). Everything
+else waits for a human.
 
 ## Where the pieces live
 
