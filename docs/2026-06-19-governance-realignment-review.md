@@ -41,7 +41,7 @@ runner integrity (deployed scanner compared to its blessed source). Activates on
 **Fix:** state this explicitly in the governance doc / `governance-map.toml` comments — autonomous mutations are *approval-gated*; interactive mutations are *guardrail-gated*. Don't let the model create false confidence. (No code change required — this is a correctness-of-belief fix.)
 **Where:** `governance-map.toml` header / the governance stanza copy.
 
-### [~] 3. 🟠 Scanner↔parser version skew = silent 3am failure
+### [x] 3. 🟠 Scanner↔parser version skew = silent 3am failure
 **Status (2026-06-19):** PARTIAL. security-standards half DONE — `scripts/security-scan.sh` now
 carries a machine-readable `# SCANNER_OUTPUT_VERSION=1` marker inside a documented `OUTPUT CONTRACT`
 block (a bash comment; not emitted to stdout, so it's inert until read — verified scanner output
@@ -51,8 +51,9 @@ both read the deployed scanner). Item #3 is not protective until that assertion 
 **Update (2026-06-19): infraops assertion MERGED on infraops main (`4d99951`)** — a CLI preflight gate
 reads the deployed scanner's `SCANNER_OUTPUT_VERSION`; on mismatch/absence it sends URGENT and exits
 **before** `postSync` (reconcile-safe — a handoff-stage fix prevented a false-resolve of open items).
-Both halves are now code-complete; item #3 becomes protective on the next batched `make install`
-(which deploys the marker). Remains `[~]` only because that deploy is pending.
+Both halves merged AND the marker is now deployed (the 2026-06-19 batched `make install`), so the
+assertion is **live and protective** — a future scanner-format change without a version bump fails
+loud (reconcile-safely) instead of silently parsing zero at 3am.
 **Problem:** infraops `scan-parser.ts` parses `security-scan.sh`'s output by **implicit contract**. A `make install` that changes the scanner's output format silently breaks the parser at **runtime** — the 3am drift job quietly produces zero findings and nothing tells you.
 **Fix:** add a `# SCANNER_OUTPUT_VERSION=N` line to `security-scan.sh` and a matching assertion in infraops `paths.ts` (or the runner) so a mismatch fails loud immediately.
 **Where:** `scripts/security-scan.sh` (here) + infraops `src/security-drift/paths.ts` (tail).
