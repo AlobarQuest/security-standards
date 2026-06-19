@@ -1,7 +1,10 @@
 # Handoff → infraops build agent (DEFERRED): assert `SCANNER_OUTPUT_VERSION` to kill silent parser skew
 
 **Date:** 2026-06-19
-**Status:** **DEFERRED — do NOT start yet.** Hand this off only *after* prong 2 of item #1 lands
+**Status:** ✅ **DONE — MERGED on infraops main (`4d99951`), 2026-06-19.** Implemented as a CLI preflight
+gate that sends URGENT and exits before `postSync` on skew (reconcile-safe). Activates on the next
+batched `make install` (which deploys the marker). Retained for the record. — (original status below:)
+**Status (original):** **DEFERRED — do NOT start yet.** Hand this off only *after* prong 2 of item #1 lands
 (both touch the deployed scanner; sequence them, don't run concurrently).
 **From:** security-standards (detect lane)
 **To:** infraops-mcp-server (mutate lane) — owner of `scan-parser.ts`

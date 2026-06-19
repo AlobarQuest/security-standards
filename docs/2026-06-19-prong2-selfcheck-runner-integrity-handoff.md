@@ -1,5 +1,9 @@
 # Handoff → infraops build agent: silence `selfcheck.runner_integrity` on a legit scanner deploy
 
+> ✅ **DONE — MERGED on infraops main (`6ec32a7`), 2026-06-19.** Implemented as source-verified runner
+> integrity (deployed scanner compared to its blessed source). Activates on the next batched
+> `make install`. This handoff is retained for the record.
+
 **Date:** 2026-06-19
 **From:** security-standards (detect lane)
 **To:** infraops-mcp-server (mutate lane) — owner of the security-drift self-check

@@ -23,6 +23,9 @@ Check 13 and out-of-band edits still alert. Verified end-to-end (Check 13 `contr
 idempotent no-op on unchanged deploy, commits only the exact deployed paths). Prong 2 (the bin/
 scanner's `selfcheck.runner_integrity`, which is infraops-owned and self-healing/one-shot) is handed
 off in `docs/2026-06-19-prong2-selfcheck-runner-integrity-handoff.md`.
+**Prong 2 update (2026-06-19): MERGED on infraops main (`6ec32a7`)** — implemented as source-verified
+runner integrity (deployed scanner compared to its blessed source). Activates on the next batched
+`make install` deploy. Item #1 fully closed once that deploy lands.
 **Problem:** every legit `make install` mutates `~/.claude/{bin,hooks}` → Check 13 fires "control-plane drift → URGENT" → operator learns to reflex-dismiss it → a *real* tamper looks identical and gets dismissed. The deploy process trains you to ignore the signal tamper-evidence relies on. (The 4am executor has a plan-hash "expected-state" gate; Check 13 has no equivalent.)
 **Fix:** make the **last step of `make install` reconcile the control-plane baseline** — auto-commit the deploy diff in the `~/.claude` repo (and/or record the new expected hash, mirroring the existing `self-check.ts` runner-integrity pattern) — so a legitimate deploy is **silent** and only an *out-of-band* change alerts. This also removes the "must remember to commit after install" procedural gap.
 **Where:** `security_scan/governance/deploy.py` (make install) + the Check-13/self-check baseline. Possibly a small touch in infraops `src/security-drift/self-check.ts`.
@@ -45,12 +48,25 @@ block (a bash comment; not emitted to stdout, so it's inert until read — verif
 unchanged). The fail-loud assertion is the infraops half and is captured as a **deferred** handoff
 in `docs/2026-06-19-item3-scanner-output-version-infraops-handoff.md` (do AFTER prong 2 of #1 —
 both read the deployed scanner). Item #3 is not protective until that assertion ships.
+**Update (2026-06-19): infraops assertion MERGED on infraops main (`4d99951`)** — a CLI preflight gate
+reads the deployed scanner's `SCANNER_OUTPUT_VERSION`; on mismatch/absence it sends URGENT and exits
+**before** `postSync` (reconcile-safe — a handoff-stage fix prevented a false-resolve of open items).
+Both halves are now code-complete; item #3 becomes protective on the next batched `make install`
+(which deploys the marker). Remains `[~]` only because that deploy is pending.
 **Problem:** infraops `scan-parser.ts` parses `security-scan.sh`'s output by **implicit contract**. A `make install` that changes the scanner's output format silently breaks the parser at **runtime** — the 3am drift job quietly produces zero findings and nothing tells you.
 **Fix:** add a `# SCANNER_OUTPUT_VERSION=N` line to `security-scan.sh` and a matching assertion in infraops `paths.ts` (or the runner) so a mismatch fails loud immediately.
 **Where:** `scripts/security-scan.sh` (here) + infraops `src/security-drift/paths.ts` (tail).
 
-### [ ] 4. 🟡 Slim the stanza projection — keep the goal, drop the mechanism
-**Status (2026-06-19):** designed + planned. Spec:
+### [x] 4. 🟡 Slim the stanza projection — keep the goal, drop the mechanism
+**Status (2026-06-19):** CODE COMPLETE + merge-ready on branch `feat/governance-slim-stanza`
+(6 tasks, subagent-driven, each reviewed; final opus whole-branch review = ready-to-merge-with-fixes,
+fixes applied; 105 tests green). Per-repo stanzas retired → generated `~/.claude/OWNERSHIP.md`
+(`ownership.py:render/write/verify_ownership`) + `# Source of truth:` headers on the 5 deployed
+artifacts (verified by `make verify`); `make sync` removed; CLI gains `ownership` + `strip-stanzas`;
+`make install` now ends with `verify`. The honest-gating language (item #2) migrated into OWNERSHIP.md.
+**Task 7 migration is DEFERRED to Devon** (a single live `make install` + `make strip-stanzas` across
+the 10 repos + a one-line OWNERSHIP.md ref in `~/.claude/CLAUDE.md`) — this same deploy also closes
+the item-#1-prong-2 / item-#3 skew window. Spec:
 `docs/superpowers/specs/2026-06-19-slim-stanza-projection-design.md`.
 Plan: docs/superpowers/plans/2026-06-19-slim-stanza-projection.md
 **Problem:** generating a `<!-- governance:start/end -->` section into ~10 repos' CLAUDE.md has no enforcement that stanza == reality (only stanza == TOML). It will drift: a hand-edited stanza, a `make sync` not re-run, a forgotten new repo. Stale generated governance docs have *false authority* and will mislead build-agents. It's enterprise coordination machinery on a solo codebase.
