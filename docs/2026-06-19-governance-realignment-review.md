@@ -82,7 +82,11 @@ Plan: docs/superpowers/plans/2026-06-19-slim-stanza-projection.md
 - Then retire `make sync` + the per-repo stanza generation.
 **Where:** `security_scan/governance/stanza.py`, `governance-map.toml`, the Makefile; plus removing stanzas from consumer CLAUDE.md files.
 
-### [ ] 5. 🟡 Lower priority (note, don't over-build)
+### [x] 5. 🟡 Lower priority (note, don't over-build)
+**Status (2026-06-19):** DONE as a decision record — both gaps captured as *accepted risks* (with
+rationale + revisit-triggers) in `docs/decisions/0001-accepted-governance-gaps.md`. No code built
+(by design). Verified live: the BWS guards write no denial log (gap 1 holds); item #4 + prong 2
+narrowed gap 2 to "source == reviewed" (GitHub access control is the accepted boundary).
 - **BWS guard denials bypass the approve ledger:** the blocking guards (`bws-write/read-guard`, `bws-scan-gate`) make deny decisions invisible to change-manager — no "how many blocks this month." If you ever care, pipe denials to the existing `~/.claude/audit/high-power-actions.jsonl`. (Backend-architect: this means the lane model is strictly true only for the security-drift pathway, not BWS enforcement.)
 - **No content-verification in the deploy chain:** `make install` + Check 13 detect *that* files changed, not that deployed == reviewed. A compromised security-standards could ship a backdoored hook that reads as "expected deploy drift." Signed commits / artifact-hash would close it — but for a solo operator, GitHub access control is the practical boundary. Note the gap; don't build it yet.
 
