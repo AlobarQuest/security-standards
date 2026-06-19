@@ -7,6 +7,8 @@
 #
 # NOTE: a large FAIL baseline is EXPECTED until the audit cutover is applied.
 ###############################################################################
+# Source of truth: ~/Projects/security-standards/scripts/security-scan.sh (deployed → ~/.claude/bin/security-scan.sh)
+# Edit here, not in place; then: cd ~/Projects/security-standards && make install
 # OUTPUT CONTRACT (consumed by infraops src/security-drift/scan-parser.ts):
 #   One finding per line:  printf '%-4s %-32s %s\n'  SEV  CHECK  detail
 #     SEV     in {FAIL,WARN,PASS}

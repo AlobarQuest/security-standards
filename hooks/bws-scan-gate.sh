@@ -5,6 +5,8 @@
 # missing secret-file gitignore coverage, BWS manifest drift) so the session must
 # remediate before it can end. Silent on clean repos and repos that use no BWS.
 # Fail-open: any error here must let the session stop, never trap it.
+# Source of truth: ~/Projects/security-standards/hooks/bws-scan-gate.sh (deployed → ~/.claude/hooks/bws-scan-gate.sh)
+# Edit here, not in place; then: cd ~/Projects/security-standards && make install
 set -u
 
 INPUT=$(cat 2>/dev/null)

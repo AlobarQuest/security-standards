@@ -8,6 +8,8 @@
 #
 # The bare-token regex below is mirrored in security_scan.token_shapes.BWS_TOKEN_RX
 # (the canonical Python definition used by the read-guard). Keep the two identical.
+# Source of truth: ~/Projects/security-standards/hooks/bws-write-guard.sh (deployed → ~/.claude/hooks/bws-write-guard.sh)
+# Edit here, not in place; then: cd ~/Projects/security-standards && make install
 set -u
 
 INPUT=$(cat)

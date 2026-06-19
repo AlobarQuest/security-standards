@@ -6,6 +6,8 @@
 # piped credential reads, and hook scripts lacking error handling.
 # Exit 0 = clean, 1 = issues.
 ###############################################################################
+# Source of truth: ~/Projects/security-standards/scripts/skills-security-scan.sh (deployed → ~/.claude/bin/skills-security-scan.sh)
+# Edit here, not in place; then: cd ~/Projects/security-standards && make install
 set -uo pipefail
 ISSUES=0
 flag() { ISSUES=$((ISSUES+1)); echo "FLAG  $1"; }

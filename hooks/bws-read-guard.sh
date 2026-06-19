@@ -10,6 +10,8 @@
 # broke the guard (fail-open) once before. Pin to a known >=3.12 interpreter so
 # execution matches the package's supported floor regardless of PATH. Fall back
 # to ambient `python3` only as a last resort (the package is import-safe to 3.9).
+# Source of truth: ~/Projects/security-standards/hooks/bws-read-guard.sh (deployed → ~/.claude/hooks/bws-read-guard.sh)
+# Edit here, not in place; then: cd ~/Projects/security-standards && make install
 PYBIN=""
 for cand in \
     /opt/homebrew/bin/python3.13 \
