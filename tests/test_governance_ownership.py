@@ -1,5 +1,10 @@
-from security_scan.governance.loader import Manifest, Repo
-from security_scan.governance.ownership import START, END, strip_stanza, ensure_bws_manifest
+from security_scan.governance.__main__ import main as gov_main
+from security_scan.governance.loader import Manifest, Repo, Tool
+from security_scan.governance.ownership import (
+    START, END, strip_stanza, ensure_bws_manifest,
+    render_ownership, write_ownership, verify_ownership,
+    source_header_lines, verify_headers,
+)
 
 
 def _repo_at(tmp_path, uses_bws=True):
@@ -17,13 +22,6 @@ def test_ensure_bws_manifest(tmp_path):
     nob_dir.mkdir()
     nob = Repo(name="N", path=str(nob_dir), cls="consumer", uses_bws=False)
     assert ensure_bws_manifest(nob) == "skip"
-
-
-from security_scan.governance.__main__ import main as gov_main
-from security_scan.governance.ownership import (
-    render_ownership, write_ownership, verify_ownership,
-)
-from security_scan.governance.loader import Tool
 
 
 def _own_manifest():
@@ -65,9 +63,6 @@ def test_verify_ownership_missing_then_ok_then_drift(tmp_path):
     assert verify_ownership(m, p) == "drift"
 
 
-from security_scan.governance.ownership import source_header_lines, verify_headers
-
-
 def _hdr_manifest(tmp_path, body_first_tool="echo a\n", with_header=True):
     home = tmp_path / "home"
     (home / "scripts").mkdir(parents=True)
@@ -104,6 +99,17 @@ def test_verify_headers_flags_wrong_when_stale_header(tmp_path):
     p = (tmp_path / "home" / "scripts" / "a.sh")
     p.write_text("#!/bin/bash\n# Source of truth: WRONG/path (deployed → nope)\necho a\n")
     assert verify_headers(m) == [("a.sh", "wrong")]
+
+
+def test_verify_headers_flags_missing_when_source_file_absent(tmp_path):
+    # manifest points at a deployed tool whose source file does not exist
+    tool = Tool(name="gone.sh", lane="detect", home_repo="home",
+                source="scripts/gone.sh", artifact_class="deployed",
+                deploy_target="~/.claude/bin/gone.sh", mode="755")
+    repo = Repo(name="home", path=str(tmp_path / "home"), cls="tool-home")
+    (tmp_path / "home" / "scripts").mkdir(parents=True)
+    m = Manifest(tools=[tool], repos=[repo], runtime_dirs=[])
+    assert verify_headers(m) == [("gone.sh", "missing")]
 
 
 def test_strip_removes_block_preserves_surrounding(tmp_path):

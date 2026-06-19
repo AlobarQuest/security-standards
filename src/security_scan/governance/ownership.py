@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from .loader import Manifest, Repo
+from .loader import Manifest, Repo, Tool
 
 START = "<!-- governance:start -->"
 END = "<!-- governance:end -->"
@@ -86,7 +86,7 @@ def render_ownership(manifest: Manifest) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def write_ownership(manifest: Manifest, path) -> str:
+def write_ownership(manifest: Manifest, path: str | Path) -> str:
     p = Path(os.path.expanduser(str(path)))
     desired = render_ownership(manifest)
     if p.exists() and p.read_text() == desired:
@@ -96,14 +96,14 @@ def write_ownership(manifest: Manifest, path) -> str:
     return "written"
 
 
-def verify_ownership(manifest: Manifest, path) -> str:
+def verify_ownership(manifest: Manifest, path: str | Path) -> str:
     p = Path(os.path.expanduser(str(path)))
     if not p.exists():
         return "missing"
     return "ok" if p.read_text() == render_ownership(manifest) else "drift"
 
 
-def source_header_lines(tool, manifest: Manifest) -> list[str]:
+def source_header_lines(tool: Tool, manifest: Manifest) -> list[str]:
     home = next(r.path for r in manifest.repos if r.name == tool.home_repo)
     return [
         f"# Source of truth: {home}/{tool.source} (deployed → {tool.deploy_target})",

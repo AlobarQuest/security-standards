@@ -9,8 +9,8 @@
 #   the high-power-gate hook, and the high-power-actions audit log.
 #   In one line: autonomous mutations are APPROVAL-gated; interactive mutations are GUARDRAIL-gated.
 #
-# Projected into: deploys (make install), CLAUDE.md stanzas (make sync), verification (make verify).
-# Edit here; never hand-edit a generated <!-- governance --> stanza.
+# Projected into: deploys + control-plane reconcile (make install), ~/.claude/OWNERSHIP.md + source headers (make ownership), verification (make verify).
+# Edit here. Each deployed artifact carries a generated "# Source of truth:" header — edit the source, then: cd ~/Projects/security-standards && make install.
 
 # ─────────────────────────── Deployed artifacts ───────────────────────────
 [[tool]]
