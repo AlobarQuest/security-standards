@@ -64,9 +64,13 @@ fixes applied; 105 tests green). Per-repo stanzas retired → generated `~/.clau
 (`ownership.py:render/write/verify_ownership`) + `# Source of truth:` headers on the 5 deployed
 artifacts (verified by `make verify`); `make sync` removed; CLI gains `ownership` + `strip-stanzas`;
 `make install` now ends with `verify`. The honest-gating language (item #2) migrated into OWNERSHIP.md.
-**Task 7 migration is DEFERRED to Devon** (a single live `make install` + `make strip-stanzas` across
-the 10 repos + a one-line OWNERSHIP.md ref in `~/.claude/CLAUDE.md`) — this same deploy also closes
-the item-#1-prong-2 / item-#3 skew window. Spec:
+**Task 7 migration DONE (2026-06-19):** `make install` deployed the marker + source headers (prong-1
+auto-committed the hooks in `~/.claude`) and generated `~/.claude/OWNERSHIP.md`; an OWNERSHIP ref was
+added to `~/.claude/CLAUDE.md`; `make strip-stanzas` cleaned all 10 repos (4 retained-content stanza
+removals committed; 6 stanza-only `CLAUDE.md` deleted — ownership now lives only in the global
+OWNERSHIP.md). This same deploy **closed the item-#1-prong-2 / item-#3 skew window** (deployed scanner
+now carries the marker). Verified: `make verify` in sync; Check 13 `controlplane.clean`; Check 14
+`governance.artifacts_in_sync`. Spec:
 `docs/superpowers/specs/2026-06-19-slim-stanza-projection-design.md`.
 Plan: docs/superpowers/plans/2026-06-19-slim-stanza-projection.md
 **Problem:** generating a `<!-- governance:start/end -->` section into ~10 repos' CLAUDE.md has no enforcement that stanza == reality (only stanza == TOML). It will drift: a hand-edited stanza, a `make sync` not re-run, a forgotten new repo. Stale generated governance docs have *false authority* and will mislead build-agents. It's enterprise coordination machinery on a solo codebase.
