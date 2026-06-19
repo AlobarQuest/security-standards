@@ -1,5 +1,5 @@
 from security_scan.governance.loader import Manifest, Repo
-from security_scan.governance.stanza import render_stanza, block, START, END
+from security_scan.governance.ownership import render_stanza, block, START, END
 
 TOOLHOME = Repo(name="infraops-mcp-server", path="~/Projects/infraops-mcp-server",
                 cls="tool-home", lane="mutate",
@@ -48,7 +48,7 @@ def test_block_is_wrapped_in_markers():
     assert b.rstrip().endswith(END)
 
 
-from security_scan.governance.stanza import (
+from security_scan.governance.ownership import (
     sync_stanza, verify_stanza, ensure_bws_manifest,
 )
 

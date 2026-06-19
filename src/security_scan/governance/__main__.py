@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .loader import load_map
 from .deploy import deploy_artifacts, reconcile_control_plane, verify_artifacts
-from .stanza import sync_stanza, verify_stanza, ensure_bws_manifest
+from .ownership import sync_stanza, verify_stanza, ensure_bws_manifest
 
 DEFAULT_MAP = Path(__file__).resolve().parents[3] / "governance-map.toml"
 
