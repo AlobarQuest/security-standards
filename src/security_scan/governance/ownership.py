@@ -173,3 +173,28 @@ def verify_ownership(manifest: Manifest, path) -> str:
     if not p.exists():
         return "missing"
     return "ok" if p.read_text() == render_ownership(manifest) else "drift"
+
+
+def source_header_lines(tool, manifest: Manifest) -> list[str]:
+    home = next(r.path for r in manifest.repos if r.name == tool.home_repo)
+    return [
+        f"# Source of truth: {home}/{tool.source} (deployed → {tool.deploy_target})",
+        "# Edit here, not in place; then: cd ~/Projects/security-standards && make install",
+    ]
+
+
+def verify_headers(manifest: Manifest) -> list[tuple[str, str]]:
+    from .deploy import _source_path
+    problems: list[tuple[str, str]] = []
+    for t in manifest.tools:
+        if t.artifact_class != "deployed":
+            continue
+        try:
+            text = _source_path(t, manifest).read_text()
+        except (FileNotFoundError, KeyError):
+            problems.append((t.name, "missing"))
+            continue
+        if source_header_lines(t, manifest)[0] in text:
+            continue
+        problems.append((t.name, "wrong" if "# Source of truth:" in text else "missing"))
+    return problems

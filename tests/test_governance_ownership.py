@@ -170,3 +170,45 @@ def test_verify_ownership_missing_then_ok_then_drift(tmp_path):
     assert verify_ownership(m, p) == "ok"
     p.write_text(p.read_text() + "tamper\n")
     assert verify_ownership(m, p) == "drift"
+
+
+from security_scan.governance.ownership import source_header_lines, verify_headers
+
+
+def _hdr_manifest(tmp_path, body_first_tool="echo a\n", with_header=True):
+    home = tmp_path / "home"
+    (home / "scripts").mkdir(parents=True)
+    tool = Tool(name="a.sh", lane="detect", home_repo="home",
+                source="scripts/a.sh", artifact_class="deployed",
+                deploy_target="~/.claude/bin/a.sh", mode="755")
+    repo = Repo(name="home", path=str(home), cls="tool-home")
+    m = Manifest(tools=[tool], repos=[repo], runtime_dirs=[])
+    hdr = "\n".join(source_header_lines(tool, m)) + "\n" if with_header else ""
+    (home / "scripts" / "a.sh").write_text("#!/bin/bash\n" + hdr + body_first_tool)
+    return m
+
+
+def test_source_header_first_line_names_source_and_target(tmp_path):
+    m = _hdr_manifest(tmp_path)
+    first = source_header_lines(m.tools[0], m)[0]
+    assert "Source of truth:" in first
+    assert "scripts/a.sh" in first
+    assert "~/.claude/bin/a.sh" in first
+
+
+def test_verify_headers_ok_when_present(tmp_path):
+    m = _hdr_manifest(tmp_path, with_header=True)
+    assert verify_headers(m) == []
+
+
+def test_verify_headers_flags_missing(tmp_path):
+    m = _hdr_manifest(tmp_path, with_header=False)
+    assert verify_headers(m) == [("a.sh", "missing")]
+
+
+def test_verify_headers_flags_wrong_when_stale_header(tmp_path):
+    m = _hdr_manifest(tmp_path, with_header=False)
+    src = next(iter([m.tools[0]]))
+    p = (tmp_path / "home" / "scripts" / "a.sh")
+    p.write_text("#!/bin/bash\n# Source of truth: WRONG/path (deployed → nope)\necho a\n")
+    assert verify_headers(m) == [("a.sh", "wrong")]
