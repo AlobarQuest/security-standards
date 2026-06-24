@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/session-sync.sh\"",
+            "timeout": 20,
+            "statusMessage": "Checking main is current…"
+          }
+        ]
+      }
+    ]
+  }
+}
