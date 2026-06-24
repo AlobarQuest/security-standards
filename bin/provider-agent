@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""Provider-agent wrapper: call this provider's Claude agent as a gated,
+stateful subprocess. Installed by the provider-agent-setup skill.
+
+Usage:
+    bin/provider-agent --session <name> "<complaint + context>"
+
+Reuse the same --session name to continue the same thread.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+BRIEF_PATH = REPO_ROOT / "provider-agent-brief.md"
+SESSIONS_DIR = REPO_ROOT / ".provider-agent" / "sessions"
+
+ALLOWED_TOOLS = "Read Edit Write Grep Glob Bash Skill"
+DISALLOWED_TOOLS = "mcp__infraops"
+PERMISSION_MODE = "acceptEdits"
+
+
+def session_file(name: str) -> Path:
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
+    return SESSIONS_DIR / f"{safe}.json"
+
+
+def read_session_id(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text()).get("session_id")
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def write_session_id(path: Path, session_id: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"session_id": session_id}, indent=2))
+
+
+def build_claude_argv(prompt: str, brief_text: str, resume_id: str | None) -> list[str]:
+    argv = [
+        "claude", "-p", prompt,
+        "--output-format", "json",
+        "--append-system-prompt", brief_text,
+        "--allowedTools", ALLOWED_TOOLS,
+        "--disallowedTools", DISALLOWED_TOOLS,
+        "--permission-mode", PERMISSION_MODE,
+    ]
+    if resume_id:
+        argv += ["--resume", resume_id]
+    return argv
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Call this provider's agent.")
+    parser.add_argument("--session", required=True, help="Stable thread name.")
+    parser.add_argument("prompt", help="The request / complaint + context.")
+    args = parser.parse_args(argv)
+
+    if not BRIEF_PATH.exists():
+        print(f"error: missing brief at {BRIEF_PATH}", file=sys.stderr)
+        return 2
+    brief_text = BRIEF_PATH.read_text()
+
+    sfile = session_file(args.session)
+    resume_id = read_session_id(sfile)
+
+    proc = subprocess.run(
+        build_claude_argv(args.prompt, brief_text, resume_id),
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        sys.stderr.write(proc.stderr)
+        return proc.returncode
+
+    try:
+        payload = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        sys.stderr.write(f"error: could not parse claude JSON output\n{proc.stdout}")
+        return 1
+    new_id = payload.get("session_id")
+    if new_id:
+        write_session_id(sfile, new_id)
+    result = payload.get("result")
+    if result:
+        print(result)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
