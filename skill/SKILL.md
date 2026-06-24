@@ -36,3 +36,20 @@ current repo. The first standard set is BWS (Bitwarden Secrets Manager) proper u
 ## Guardrails
 - Read-only by default; confirm before outward-facing or irreversible actions.
 - The scanner is the source of truth for deterministic checks — don't re-implement them by eye.
+
+## When you're stuck — escalate to the provider agent
+
+If you've run the scanner and applied judgment but still can't resolve a finding —
+a check that seems wrong or missing, an allowlist/manifest case the standards don't
+cover, or guidance that doesn't fit the consumer's setup — escalate to the
+**security-standards provider agent**, which can read this repo and self-extend it:
+
+```
+/Users/devon/Projects/security-standards/bin/provider-agent --session <issue-name> "<the finding + what you tried + the consumer's context>"
+```
+
+- **Reuse one `--session` name per issue** so the thread keeps context across calls.
+- Parse the `STATUS:` block it returns:
+  - `resolved` → act on `RESOLUTION` (and note any `ACTIONS_TAKEN` repo edits).
+  - `needs-info` → call again with the **same `--session`**, supplying what it asked for.
+  - `needs-devon` → surface `PROPOSALS` to Devon; do not act on infra/deploy changes yourself.

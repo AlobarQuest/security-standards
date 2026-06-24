@@ -31,6 +31,20 @@ set -uo pipefail   # deliberately NOT -e: run every check, don't abort early
 # resolving our own dependencies.)
 export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
+# Pin a Python >= 3.11 for our own module subprocesses (read-guard self-check,
+# governance verify). `tomllib` — used by security_scan.governance/manifest/allowlist
+# — is stdlib only on 3.11+, but a launchd/autonomous PATH can resolve bare `python3`
+# to Apple's /usr/bin 3.9 (no tomllib): the module then crashes at import and its
+# traceback surfaces as a false "drift" finding. The .venv path is absolute, so it
+# holds even under a hostile PATH. Don't trust ambient `python3`.
+PY=""
+for _cand in "$HOME/Projects/security-standards/.venv/bin/python" python3.12 python3.11 python3; do
+  if command -v "$_cand" >/dev/null 2>&1 \
+     && "$_cand" -c 'import sys, tomllib; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
+    PY="$(command -v "$_cand")"; break
+  fi
+done
+
 TS="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 AUDIT_DIR="${HOME}/.claude/audit"
 LOG="${AUDIT_DIR}/security-scan-$(date -u '+%Y%m%d').log"
@@ -244,7 +258,9 @@ fi
 #     security-standards repo on a branch without the package). A FAIL means the
 #     read-guard is not protecting reads right now.
 # ---------------------------------------------------------------------------
-if RG_OUT="$(PYTHONPATH="$HOME/Projects/security-standards/src" python3 -m security_scan.read_guard.selfcheck --canary 2>&1)"; then
+if [ -z "$PY" ]; then
+  emit WARN readguard.health "no python>=3.11 interpreter found; self-check skipped"
+elif RG_OUT="$(PYTHONPATH="$HOME/Projects/security-standards/src" "$PY" -m security_scan.read_guard.selfcheck --canary 2>&1)"; then
   emit PASS readguard.health "read-guard wired + canary ok"
 else
   emit FAIL readguard.health "read-guard self-check FAILED: $(printf '%s' "$RG_OUT" | tr '\n' ';' | tr -s ' ')"
@@ -280,12 +296,14 @@ fi
 # ---------------------------------------------------------------------------
 # ── Check: deployed artifacts match their home repos (governance-map) ──
 SECSTD="$HOME/Projects/security-standards"
-if [ -f "$SECSTD/governance-map.toml" ] && have python3; then
-  if gv_out="$(cd "$SECSTD" && PYTHONPATH=src python3 -m security_scan.governance verify --artifacts-only 2>&1)"; then
+if [ -f "$SECSTD/governance-map.toml" ] && [ -n "$PY" ]; then
+  if gv_out="$(cd "$SECSTD" && PYTHONPATH=src "$PY" -m security_scan.governance verify --artifacts-only 2>&1)"; then
     emit PASS governance.artifacts_in_sync "deployed artifacts match home repos"
   else
     emit FAIL governance.artifacts_in_sync "$(printf '%s' "$gv_out" | tr '\n' ';')"
   fi
+elif [ -f "$SECSTD/governance-map.toml" ]; then
+  emit WARN governance.artifacts_in_sync "no python>=3.11 interpreter found; check skipped"
 fi
 # ---------------------------------------------------------------------------
 echo "=== summary: PASS=$PASS WARN=$WARN FAIL=$FAIL ===" | tee -a "$LOG"
