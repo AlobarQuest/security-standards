@@ -101,12 +101,6 @@ class = "consumer"
 uses_bws = true
 
 [[repo]]
-name = "InfraManager"
-path = "~/Projects/InfraManager"
-class = "consumer"
-uses_bws = true
-
-[[repo]]
 name = "rental-investment-calculator"
 path = "~/Projects/rental-investment-calculator"
 class = "consumer"
