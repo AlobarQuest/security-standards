@@ -143,7 +143,7 @@ flowchart TB
     CP["<b>~/.claude control plane</b> (git repo)<br/>deployed guards + scanner + OWNERSHIP.md · tamper-evidence"]:::cp
     IO["<b>MUTATE — infraops-mcp-server</b><br/>~213 infra tools · security-drift subsystem · 4am executor"]:::mut
     CM["<b>APPROVE — change-manager</b> (deployed service)<br/>plan-hash approval ledger · /api/sync"]:::app
-    CONS["<b>GOVERNED consumer repos</b> (ingress — enforced upon)<br/>Contacts · FacelessTT · imap-mcp-server · InfraManager ·<br/>rental-investment-calculator · VideoCreator · vps-backup"]:::gov
+    CONS["<b>GOVERNED consumer repos</b> (ingress — enforced upon)<br/>Contacts · FacelessTT · imap-mcp-server ·<br/>rental-investment-calculator · VideoCreator · vps-backup"]:::gov
     STATE[("Runtime state (0600, repo-less)<br/>~/.config/infra-drift · ~/.claude/audit")]:::st
     INFRA[("Real infra<br/>VPS · Coolify · DNS · DBs")]:::inf
 
@@ -187,7 +187,7 @@ flowchart TB
      │ guards enforce / scan every session + repo
      ▼
    GOVERNED consumer repos ── fetch secrets by UUID ──► BWS
-   (Contacts · FacelessTT · imap-mcp-server · InfraManager ·
+   (Contacts · FacelessTT · imap-mcp-server ·
     rental-investment-calculator · VideoCreator · vps-backup)
 
    infraops ── apply approved fixes ──► REAL INFRA (VPS · Coolify · DNS · DBs)
