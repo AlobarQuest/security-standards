@@ -62,6 +62,39 @@ def render_ownership(manifest: Manifest) -> str:
         "To change any deployed artifact: edit the source, then "
         "`cd ~/Projects/security-standards && make install`.",
         "",
+    ]
+    # Control-plane host: the git work-tree that version-tracks ~/.claude/ itself.
+    # Distinct from a security lane — it is the version-control home of the global
+    # config, and where `make install` (reconcile_control_plane) commits the
+    # deployed artifacts above.
+    hosts = [r for r in manifest.repos if r.cls == "host"]
+    hosted = [t for t in manifest.tools if t.artifact_class == "hosted"]
+    if hosts:
+        lines += ["## Control-plane host", ""]
+        for h in hosts:
+            remote = f" (`{h.remote}`)" if h.remote else ""
+            lines.append(
+                f"**{h.name}**{remote} is the version-control home of `{h.path}/`. "
+                "It owns the global config natively and version-tracks the deployed "
+                "artifacts above — the `reconcile_control_plane` step of `make install` "
+                "commits them here, so a legitimate deploy is silent to the Check-13 "
+                "tamper-evidence scan while out-of-band edits still surface as drift."
+            )
+        if hosted:
+            lines += [
+                "",
+                "Hosted in place — authored and version-tracked here, **not** deployed "
+                "from a source-of-truth elsewhere (so these carry no `# Source of truth:` "
+                "header):",
+                "",
+                "| Artifact | Version-tracked in |",
+                "| --- | --- |",
+            ]
+            for t in hosted:
+                home = homes[t.home_repo].path
+                lines.append(f"| `{home}/{t.source}` | {t.home_repo} |")
+        lines.append("")
+    lines += [
         "## Tool-home repos",
         "",
     ]

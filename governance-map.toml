@@ -58,6 +58,44 @@ artifact_class = "deployed"
 deploy_target = "~/.claude/hooks/bws-scan-gate.sh"
 mode = "755"
 
+# ───────────────────── Control-plane host (version-control home of ~/.claude/) ─────────────────────
+# The ~/.claude/ directory is itself a git repo. It is NOT governed by security-standards
+# (no detect/mutate/approve lane) — it is the version-control HOME of the global config and
+# the work-tree where `make install` (reconcile_control_plane) commits the deployed artifacts.
+# Hosted artifacts are authored AND version-tracked here, so they carry no source-of-truth header.
+[[repo]]
+name = "claude-control-plane"
+path = "~/.claude"
+class = "host"
+remote = "https://github.com/AlobarQuest/claude-control-plane.git"
+owns = [
+  "~/.claude/CLAUDE.md (global session instructions)",
+  "~/.claude/RTK.md",
+  "~/.claude/settings.json",
+  "version-tracking of all deployed hooks + bin/ (source-of-truth: security-standards)",
+]
+
+[[tool]]
+name = "CLAUDE.md"
+lane = "host"
+home_repo = "claude-control-plane"
+source = "CLAUDE.md"
+artifact_class = "hosted"
+
+[[tool]]
+name = "RTK.md"
+lane = "host"
+home_repo = "claude-control-plane"
+source = "RTK.md"
+artifact_class = "hosted"
+
+[[tool]]
+name = "settings.json"
+lane = "host"
+home_repo = "claude-control-plane"
+source = "settings.json"
+artifact_class = "hosted"
+
 # ─────────────────────────────── Repos ────────────────────────────────────
 [[repo]]
 name = "security-standards"

@@ -46,6 +46,38 @@ def test_render_ownership_has_artifact_lane_and_gating():
     assert "security-standards" in s and "FacelessTT" in s
 
 
+def _host_manifest():
+    m = _own_manifest()
+    m.repos.append(Repo(
+        name="claude-control-plane", path="~/.claude", cls="host",
+        remote="https://github.com/AlobarQuest/claude-control-plane.git",
+        owns=["~/.claude/CLAUDE.md (global session instructions)"],
+    ))
+    m.tools.append(Tool(
+        name="CLAUDE.md", lane="host", home_repo="claude-control-plane",
+        source="CLAUDE.md", artifact_class="hosted",
+    ))
+    return m
+
+
+def test_render_ownership_covers_control_plane_host():
+    s = render_ownership(_host_manifest())
+    assert "## Control-plane host" in s
+    assert "claude-control-plane" in s
+    assert "github.com/AlobarQuest/claude-control-plane.git" in s
+    # the global CLAUDE.md is now surfaced as a hosted artifact
+    assert "~/.claude/CLAUDE.md" in s
+    # hosted artifacts are not in the deployed table and carry no source header
+    assert "no `# Source of truth:` header" in s
+    # a hosted tool must not leak into the deployed-artifacts verification surface
+    assert verify_headers(_host_manifest()) == []
+
+
+def test_render_ownership_omits_host_section_when_absent():
+    # the base manifest has no host repo → no host section, no empty scaffolding
+    assert "## Control-plane host" not in render_ownership(_own_manifest())
+
+
 def test_write_ownership_idempotent(tmp_path):
     m = _own_manifest()
     p = tmp_path / "OWNERSHIP.md"
