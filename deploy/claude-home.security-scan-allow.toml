@@ -1,0 +1,21 @@
+# Source of truth: ~/Projects/security-standards/deploy/claude-home.security-scan-allow.toml (deployed → ~/.claude/.security-scan-allow.toml)
+# Edit here, not in place; then: cd ~/Projects/security-standards && make install
+#
+# Allowlist of known-safe scanner findings for the claude-control-plane repo (~/.claude).
+# `make install` deploys the BWS enforcement hooks INTO ~/.claude/hooks/; the deployed
+# bws-write-guard.sh necessarily embeds the bootstrap-token SHAPE in its own detection
+# PATTERN and a descriptive comment — detecting that shape IS the hook's job. No real
+# credential is present. Each entry exempts ONE exact finding (rule + file + redacted
+# evidence); if the matched length changes the entry fails closed and re-BLOCKs, forcing
+# a conscious re-review. A real token in any other file still BLOCKs.
+#
+# Empirically, this single BLOCK is the only finding the Stop gate (bws-scan-gate.sh)
+# blocks on for ~/.claude. The scan also emits WARN/INFO findings (a missing
+# .bws-secrets.toml manifest and undeclared UUIDs) which are real signal, do not block,
+# and are deliberately NOT allowlisted.
+
+[[allow]]
+rule = "bws.bootstrap-token-not-inline"
+file = "hooks/bws-write-guard.sh"
+evidence = "BWS_ACCE…(len 21)"
+reason = "Hook's own detection pattern + descriptive comment; not a real credential. Deployed verbatim from security-standards (which allowlists the identical match in its source copy)."
