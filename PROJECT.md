@@ -7,6 +7,8 @@ purpose: 'Deterministic + judgment-based enforcement of security standards (v1: 
 version: 0.1.0
 version_source: pyproject
 updated: '2026-06-26'
+foundation: true
+applicable_standards: [project, security, code]
 ---
 
 ## Backlog
