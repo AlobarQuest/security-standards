@@ -11,9 +11,13 @@ id_*
 .DS_Store
 
 .venv/
+.venv-events/
 __pycache__/
 *.egg-info/
 .pytest_cache/
 
 # provider-agent session state (stateful claude -p threads)
 .provider-agent/sessions/
+
+# factory-events local DB compose env (secrets)
+deploy/factory-events-db/.env

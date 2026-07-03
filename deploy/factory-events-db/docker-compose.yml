@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16
+    container_name: factory-events-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: factory_events
+      POSTGRES_USER: factory_events
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    ports:
+      - "5545:5432"
+    volumes:
+      - factory_events_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U factory_events -d factory_events"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+volumes:
+  factory_events_pgdata:
