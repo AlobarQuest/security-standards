@@ -20,7 +20,7 @@ def _home(tmp_path, monkeypatch):
 @pytest.fixture()
 def source(tmp_path) -> Path:
     src = tmp_path / "high-power-actions.jsonl"
-    shutil.copy(FIXTURE, src)  # noqa: E501
+    shutil.copy(FIXTURE, src)
     return src
 
 
@@ -79,3 +79,22 @@ def test_truncated_source_raises(source):
     source.write_text("")
     with pytest.raises(high_power.WatermarkError):
         high_power.adapt(source=source)
+
+
+def test_malformed_source_line_raises_source_error_and_keeps_watermark(source):
+    high_power.adapt(source=source)
+    with source.open("a") as fh:
+        fh.write("{not json\n")
+    with pytest.raises(high_power.SourceError):
+        high_power.adapt(source=source)
+    # watermark untouched by the failed run: fixing the file resumes cleanly
+    assert len(store.event_ids()) == 3
+
+
+def test_cli_reports_source_error(tmp_path, monkeypatch, capsys):
+    src = tmp_path / "hp.jsonl"
+    src.write_text("{not json\n")
+    monkeypatch.setattr(high_power, "DEFAULT_SOURCE", src)
+    from factory_events.cli import main
+    assert main(["adapt", "--source", "high-power"]) == 1
+    assert "ADAPT FAIL (high-power)" in capsys.readouterr().err

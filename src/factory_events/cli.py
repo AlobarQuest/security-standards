@@ -55,8 +55,8 @@ def _cmd_adapt(args: argparse.Namespace) -> int:
         if args.source == "high-power":
             count = high_power.adapt(reanchor=args.reanchor)
             print(f"high-power: {count} events appended")
-    except high_power.WatermarkError as exc:
-        print(f"ADAPT FAIL: {exc}", file=sys.stderr)
+    except (high_power.WatermarkError, high_power.SourceError) as exc:
+        print(f"ADAPT FAIL (high-power): {exc}", file=sys.stderr)
         return 1
     return 0
 

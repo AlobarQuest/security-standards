@@ -1,17 +1,19 @@
 """Adapter: ~/.claude/audit/high-power-actions.jsonl -> factory-events store.
 
-Watermark = {line_count, last_line_sha256}. A hash mismatch means the source
-was rewritten/rotated: fail loudly; --reanchor re-ingests from line 0 and the
+Watermark = {line_count, content_sha256} where content_sha256 hashes all processed
+lines — any rewrite in the ingested region is detected. A hash mismatch means the
+source was rewritten/rotated: fail loudly; --reanchor re-ingests from line 0 and the
 deterministic event_id (sha256 of the source line) dedupes against the store.
 Backfill scope is the live file only (spec §4 — .bak snapshots declined).
 """
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 from factory_events import store
-from factory_events.envelope import deterministic_event_id, make_event
+from factory_events.envelope import EnvelopeError, deterministic_event_id, make_event
 
 DEFAULT_SOURCE = Path.home() / ".claude" / "audit" / "high-power-actions.jsonl"
 SYSTEM = "high-power-audit"
@@ -20,6 +22,10 @@ _TARGET_KEYS = ("command", "host", "domain", "to", "name", "uuid")
 
 class WatermarkError(RuntimeError):
     """Source file changed under the watermark — refuse to guess."""
+
+
+class SourceError(RuntimeError):
+    """A source line could not be parsed/mapped — refuse to guess or skip."""
 
 
 def _watermark_path() -> Path:
@@ -38,12 +44,16 @@ def _save_watermark(lines: list[str]) -> None:
     content = "\n".join(lines)
     mark = {
         "line_count": len(lines),
-        "last_line_sha256": hashlib.sha256(content.encode()).hexdigest() if lines else None,
+        "content_sha256": hashlib.sha256(content.encode()).hexdigest() if lines else None,
     }
-    path.write_text(json.dumps(mark, indent=1))
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(mark, indent=1))
+    os.replace(tmp, path)
 
 
 def _extract_target(args_summary: str) -> str | None:
+    # Best-effort target: first present key in priority order;
+    # adapters own their target conventions.
     try:
         args = json.loads(args_summary)
     except (json.JSONDecodeError, TypeError):
@@ -89,7 +99,7 @@ def adapt(source: Path | None = None, reanchor: bool = False) -> int:
         # Check if any of the processed lines changed
         if count > 0:
             content = "\n".join(lines[:count])
-            if hashlib.sha256(content.encode()).hexdigest() != mark["last_line_sha256"]:
+            if hashlib.sha256(content.encode()).hexdigest() != mark["content_sha256"]:
                 raise WatermarkError(
                     f"{source} changed under the watermark (rewritten/rotated/truncated); "
                     "re-run with --reanchor to accept the file as a new baseline"
@@ -100,7 +110,12 @@ def adapt(source: Path | None = None, reanchor: bool = False) -> int:
     for offset, raw_line in enumerate(lines[start:], start=start + 1):
         if not raw_line.strip():
             continue
-        event = _map_line(raw_line, lineno=offset)
+        try:
+            event = _map_line(raw_line, lineno=offset)
+        except (json.JSONDecodeError, KeyError, EnvelopeError) as exc:
+            raise SourceError(
+                f"{source}:{offset}: unparseable/unmappable source line: {exc}"
+            ) from exc
         if event["event_id"] in known:
             continue
         store.append_event(event)
