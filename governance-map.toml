@@ -71,6 +71,15 @@ artifact_class = "deployed"
 deploy_target = "~/.claude/.security-scan-allow.toml"
 mode = "644"
 
+[[tool]]
+name = "factory-events-nightly.sh"
+lane = "detect"
+home_repo = "security-standards"
+source = "scripts/factory-events-nightly.sh"
+artifact_class = "deployed"
+deploy_target = "~/.claude/bin/factory-events-nightly.sh"
+mode = "755"
+
 # ───────────────────── Control-plane host (version-control home of ~/.claude/) ─────────────────────
 # The ~/.claude/ directory is itself a git repo. It is NOT governed by security-standards
 # (no detect/mutate/approve lane) — it is the version-control HOME of the global config and

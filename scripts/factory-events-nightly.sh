@@ -1,6 +1,7 @@
 #!/bin/bash
 # factory-events nightly: adapt -> verify (incl. anchor) -> ship -> healthcheck ping.
-# Source of truth: security-standards scripts/factory-events-nightly.sh (WS-1.1).
+# Source of truth: ~/Projects/security-standards/scripts/factory-events-nightly.sh (deployed → ~/.claude/bin/factory-events-nightly.sh)
+# Edit here, not in place; then: cd ~/Projects/security-standards && make install
 # Config: ~/.factory/env (chmod 600) — CM_BASE_URL, CM_M2M_TOKEN, FACTORY_DB_DSN,
 # FACTORY_HC_PING_URL (optional; ping skipped when unset).
 set -euo pipefail
