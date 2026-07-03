@@ -54,10 +54,14 @@ Companion §3.5 fields plus `schema` and `source`:
 | `source` | object, required | `{system, ref}` provenance. `system` ∈ `high-power-audit \| change-manager \| direct`; `ref` = line number/id or emitter name. |
 
 **Provisional actor vocabulary** (documented in the package README, replaced by the
-WS-1.2 registry): `interactive-claude-code`, `change-window-agent`, `security-executor`,
+WS-1.2 registry): `claude-code-unattributed`, `change-window-agent`, `security-executor`,
 `drift-reconciler`, `open-engine-runner`, `devon`, `unknown`.
-Adapter mapping: high-power records → `interactive-claude-code` (its hook only fires in
-interactive sessions). ChangeEvent → its own `actor` column mapped onto the vocabulary
+Adapter mapping: high-power records → `claude-code-unattributed` — the PostToolUse hook
+fires in *any* Claude Code session on this machine (interactive, headless `claude -p`
+provider agents, scheduled runners), so the source data cannot distinguish them; a
+confidently wrong actor is worse than an honest one. The session UUID in
+`correlation_id` carries what attribution is possible until WS-1.2 gives sessions
+declared identities. ChangeEvent → its own `actor` column mapped onto the vocabulary
 (`devon` for GUI decisions, `drift-reconciler` for reconcile, `change-window-agent` for
 window runs), `unknown` where unmappable.
 
@@ -76,6 +80,12 @@ in JSONL, Postgres, or an API payload.
   *prevented* by adapter watermarks and deduped by the projection's PK.
 - **Verify:** `python3 -m factory_events verify` walks the whole chain, recomputes
   every hash, schema-validates every event; first break → non-zero exit + report.
+- **Head-hash anchoring:** the chain alone cannot evidence a full rewrite-and-rechain
+  by a writer with file access. The nightly job therefore anchors the current head
+  hash outside the file's write domain: (a) in the Healthchecks.io ping payload, and
+  (b) in a `chain_heads` table in the projection (`anchored_at`, `seq`, `head_hash`)
+  that `ship --rebuild` never truncates. `verify --against-anchor` checks the chain
+  still contains yesterday's anchored `(seq, head_hash)`.
 - **Governance:** the store path and LaunchAgent get entries in
   `governance-map.toml` (this repo owns them); the file is added to vps-backup's
   mini config-tree coverage during build.
@@ -108,7 +118,13 @@ Module layout: `envelope.py` (model, canonicalization, validation), `store.py`
   `adapt --source high-power --reanchor` accepts the new baseline.
 - Map: `timestamp`→`timestamp`; `tool`→`action` (`tool.<name>`, MCP prefix stripped);
   `session_id`→`correlation_id`; `args_summary` + `provenance` → `evidence` source-record;
-  `result: unknown`; `actor: interactive-claude-code`.
+  `result: unknown`; `actor: claude-code-unattributed` (see §1 — the hook cannot
+  distinguish interactive from headless sessions).
+- Backfill scope — **decided by Devon 2026-07-02:** the live file only. The rotating
+  `.bak-<timestamp>` snapshots are NOT merged: those records are effectively superseded
+  by this system (they couldn't answer the questions this store exists to answer), and
+  there is no current use for them. The factory store is authoritative from its first
+  adapter run.
 - `event_id` = sha256 of `high-power-audit:<raw source line>` (per the §1 rule) →
   re-runs and re-anchors dedupe in the projection even if the JSONL gains duplicates.
 - Watermark advances only after all appends succeed.
@@ -118,6 +134,9 @@ Module layout: `envelope.py` (model, canonicalization, validation), `store.py`
   `change_items.identity` (+ `rule_key`, `provider`) so `target` is meaningful;
   cursor = autoincrement `ChangeEvent.id`, ascending, stable.
 - Watermark in `~/.factory/state/change-manager.json`: `{last_id}`.
+- Credential: the M2M key is fetched per the standard pattern — BWS secret referenced
+  by stable UUID, listed in this repo's `.bws-secrets.toml`, loaded at runtime from a
+  gitignored env file (never in a tracked file or the LaunchAgent plist).
 - Map: `at`→`timestamp`; `event_type`→`action` (`change.<event_type>`);
   `actor`→vocabulary-mapped `actor`; item identity→`target`;
   `item_id`→`correlation_id` (`change-item:<id>`); `from_status/to_status/detail/
@@ -172,14 +191,18 @@ GHCR → Coolify webhook). No schema or logger changes there.
 - Additional sources: read-guard audit log, runner evidence, WS-0.6 receipts —
   Phase 3 wires those through the same adapters pattern.
 - Retention/rotation policy for the JSONL (revisit when size hurts).
-- Remote hash anchoring / HMAC / signatures (chain only).
+- HMAC / signatures / third-party timestamping (the nightly head-hash anchor in §2 is
+  in scope; cryptographic signing is not).
+- Backfilling the high-power `.bak-<timestamp>` snapshots (declined — see §4).
 - Any GUI or query API; Coolify/prod deployment of the projection.
 - Retrofitting the chain onto `high-power-actions.jsonl` itself.
 
 ## 9. Success criteria
 
-1. Both historical streams fully adapted; `verify` green over the whole chain.
-2. Nightly LaunchAgent run completes adapt→verify→ship with a healthcheck ping.
+1. Both streams fully adapted (live high-power file + full ChangeEvent history);
+   `verify` green over the whole chain.
+2. Nightly LaunchAgent run completes adapt→verify→ship with a healthcheck ping
+   carrying the anchored head hash; `verify --against-anchor` passes on day 2.
 3. "What happened?" answerable in one SQL query across both systems (e.g. all
    `vps_exec` calls and all change approvals for a given day, with actors).
 4. `emit` + provisional actor vocabulary documented as the WS-1.2 binding seam.
