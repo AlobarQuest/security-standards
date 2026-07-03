@@ -55,10 +55,44 @@ def _schema_errors(doc: dict, schema_path: Path, where: str) -> list[str]:
             for e in errors]
 
 
+def _validate_profile(stem: str, profile: dict, vocabulary: set[str]) -> list[str]:
+    errors = _schema_errors(profile, _PROFILE_SCHEMA_PATH, f"profiles/{stem}.yaml")
+    if profile.get("profile") != stem:
+        errors.append(
+            f"profiles/{stem}.yaml: filename does not match profile {profile.get('profile')!r}"
+        )
+    for field in ("capabilities", "prohibited"):
+        for term in profile.get(field, []):
+            if term not in vocabulary:
+                errors.append(f"profiles/{stem}.yaml: unknown {field} term {term!r}")
+    return errors
+
+
+def _validate_agent(
+    stem: str, agent: dict, profiles: dict[str, dict], vocabulary: set[str]
+) -> list[str]:
+    where = f"agents/{stem}.yaml"
+    errors = _schema_errors(agent, _AGENT_SCHEMA_PATH, where)
+    if agent.get("agent_id") != stem:
+        errors.append(f"{where}: filename does not match agent_id {agent.get('agent_id')!r}")
+    profile_name = agent.get("authority_profile")
+    if profile_name and profile_name not in profiles:
+        errors.append(f"{where}: authority_profile {profile_name!r} does not resolve")
+    for field in ("capabilities", "prohibited"):
+        for term in agent.get(field, []):
+            if term not in vocabulary:
+                errors.append(f"{where}: unknown {field} term {term!r}")
+    profile = profiles.get(profile_name, {}) if profile_name else {}
+    granted = set(agent.get("capabilities", [])) | set(profile.get("capabilities", []))
+    denied = set(agent.get("prohibited", [])) | set(profile.get("prohibited", []))
+    for term in sorted(granted & denied):
+        errors.append(f"{where}: {term!r} is both granted and prohibited")
+    return errors
+
+
 def validate_registry(registry_dir: Path | None = None) -> list[str]:
     """Full referential validation; returns [] when the registry is valid."""
     base = registry_dir or REGISTRY_DIR
-    errors: list[str] = []
     try:
         vocabulary = set(load_vocabulary(base))
         profiles = load_profiles(base)
@@ -66,32 +100,11 @@ def validate_registry(registry_dir: Path | None = None) -> list[str]:
     except (RegistryError, OSError, yaml.YAMLError) as exc:
         return [str(exc)]
 
+    errors: list[str] = []
     for stem, profile in profiles.items():
-        errors += _schema_errors(profile, _PROFILE_SCHEMA_PATH, f"profiles/{stem}.yaml")
-        if profile.get("profile") != stem:
-            errors.append(f"profiles/{stem}.yaml: filename does not match profile {profile.get('profile')!r}")
-        for field in ("capabilities", "prohibited"):
-            for term in profile.get(field, []):
-                if term not in vocabulary:
-                    errors.append(f"profiles/{stem}.yaml: unknown {field} term {term!r}")
-
+        errors += _validate_profile(stem, profile, vocabulary)
     for stem, agent in agents.items():
-        where = f"agents/{stem}.yaml"
-        errors += _schema_errors(agent, _AGENT_SCHEMA_PATH, where)
-        if agent.get("agent_id") != stem:
-            errors.append(f"{where}: filename does not match agent_id {agent.get('agent_id')!r}")
-        profile_name = agent.get("authority_profile")
-        if profile_name and profile_name not in profiles:
-            errors.append(f"{where}: authority_profile {profile_name!r} does not resolve")
-        for field in ("capabilities", "prohibited"):
-            for term in agent.get(field, []):
-                if term not in vocabulary:
-                    errors.append(f"{where}: unknown {field} term {term!r}")
-        profile = profiles.get(profile_name, {})
-        granted = set(agent.get("capabilities", [])) | set(profile.get("capabilities", []))
-        denied = set(agent.get("prohibited", [])) | set(profile.get("prohibited", []))
-        for term in sorted(granted & denied):
-            errors.append(f"{where}: {term!r} is both granted and prohibited")
+        errors += _validate_agent(stem, agent, profiles, vocabulary)
     return errors
 
 

@@ -15,11 +15,13 @@ VOCAB = {"schema": "capability-vocabulary/v1",
          "terms": {"repository_read": "read repo files", "repository_write": "write repo files",
                    "merge_to_main": "merge PRs to a default branch"}}
 PROFILE = {"schema": "authority-profile/v1", "profile": "test-base-v1",
-           "description": "test baseline", "capabilities": ["repository_read"], "prohibited": ["merge_to_main"]}
+           "description": "test baseline", "capabilities": ["repository_read"],
+           "prohibited": ["merge_to_main"]}
 AGENT = {"schema": "agent-identity/v1", "agent_id": "test-agent", "version": 1,
          "status": "active", "runtime": "claude-code", "operator": "devon",
          "environment": "mini", "description": "a test agent",
-         "authority_profile": "test-base-v1", "capabilities": ["repository_write"], "prohibited": []}
+         "authority_profile": "test-base-v1", "capabilities": ["repository_write"],
+         "prohibited": []}
 
 
 def write_registry(root, vocab=VOCAB, profiles=(PROFILE,), agents=(AGENT,)):
