@@ -40,3 +40,9 @@ reality — the weekly audit review and later-phase cross-checks are the defense
 - Identity declaration: session-spawning runtimes set `FACTORY_AGENT_ID` (stamped
   into the high-power log by the PostToolUse hook); the two 4AM executors thread
   their actor in-code through the change-manager API.
+- `registered_ids()` is process-cached; long-lived consumers must call
+  `agent_registry.registry.registered_ids.cache_clear()` after a registry edit
+  (the nightly adapter is a fresh process each run and is unaffected).
+- change-manager accepts any client-declared actor string unvalidated (M2M
+  trust boundary); the registry labels, it does not authenticate — a
+  misdeclared actor is caught by audit review, not by the API.
