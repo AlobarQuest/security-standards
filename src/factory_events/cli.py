@@ -1,4 +1,4 @@
-"""factory-events CLI: emit, verify (adapt/ship added by later tasks)."""
+"""factory-events CLI: emit, verify, adapt, ship."""
 
 import argparse
 import json
@@ -42,9 +42,34 @@ def _cmd_verify(args: argparse.Namespace) -> int:
             print(f"VERIFY FAIL: {err}", file=sys.stderr)
         return 1
     current = store.head()
+    if getattr(args, "against_anchor", False):
+        from factory_events import ship as ship_mod
+
+        anchor = ship_mod.last_anchor()
+        if anchor is not None:
+            seqs = {rec["seq"]: rec["hash"] for rec in store.iter_records()}
+            if seqs.get(anchor[0]) != anchor[1]:
+                print(f"VERIFY FAIL: anchored head (seq {anchor[0]}) not in chain — "
+                      "store rewritten since last anchor", file=sys.stderr)
+                return 1
+            print(f"anchor ok: seq {anchor[0]} present")
     print(f"chain ok: {current[0] if current else 0} events"
           + (f", head {current[1]}" if current else ""))
-    # Task 7 extends verify with --against-anchor
+    return 0
+
+
+def _cmd_ship(args: argparse.Namespace) -> int:
+    from factory_events import ship as ship_mod
+
+    try:
+        inserted, current = ship_mod.ship(rebuild=args.rebuild)
+    except Exception as exc:  # noqa: BLE001 — any DB failure is a hard job failure
+        print(f"SHIP FAIL: {exc}", file=sys.stderr)
+        return 1
+    if current:
+        print(f"shipped={inserted} head_seq={current[0]} head={current[1]}")
+    else:
+        print("shipped=0 (empty store)")
     return 0
 
 
@@ -85,13 +110,18 @@ def build_parser() -> argparse.ArgumentParser:
     emit.set_defaults(func=_cmd_emit)
 
     verify = sub.add_parser("verify", help="verify the full hash chain + schemas")
+    verify.add_argument("--against-anchor", action="store_true")
     verify.set_defaults(func=_cmd_verify)
 
     adapt = sub.add_parser("adapt", help="translate source logs into the store")
     adapt.add_argument("--source", required=True, choices=["high-power", "change-manager", "all"])
     adapt.add_argument("--reanchor", action="store_true")
     adapt.set_defaults(func=_cmd_adapt)
-    # Task 7 extends here: ship
+
+    ship_cmd = sub.add_parser("ship", help="upsert events into the Postgres projection")
+    ship_cmd.add_argument("--rebuild", action="store_true",
+                          help="truncate factory_events (never chain_heads) and replay")
+    ship_cmd.set_defaults(func=_cmd_ship)
     return parser
 
 
