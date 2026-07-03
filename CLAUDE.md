@@ -28,6 +28,16 @@ fast-forwards `main`; in every other state (feature branch, dirty tree, diverged
 injects a "run `git sync`" notice. It never switches branches, deletes anything, or blocks
 startup. The `git sync` alias and `fetch.prune` are configured globally on this machine.
 
+## Known Non-obvious Invariants
+
+**quality.yml invokes `make check`, which does not exist here — CI never runs this repo's pytest suite**
+The shared quality workflow's final step is `make check`, but this Makefile defines only
+`install/verify/ownership/strip-stanzas/test`, and the CI env installs no dev extras
+anyway (portfolio-wide `uv sync` invariant). The suite runs only locally (`make test`,
+both venvs) and via the diff-scoped Stop hook. Anything that must gate merges in CI
+belongs in `.github/workflows/security-scan.yml` (which pip-installs `.[dev]`) — that is
+why the WS-1.2 agent-registry validation step lives there, not in a `check` target.
+
 <!-- code-standards:start -->
 # Code Quality (code-standards layer)
 
