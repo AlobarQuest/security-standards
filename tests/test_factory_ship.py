@@ -28,6 +28,7 @@ def _seed(n: int) -> None:
 @pytest.fixture()
 def pg(monkeypatch):
     monkeypatch.setenv("FACTORY_DB_DSN", DSN)
+    assert DSN is not None
     import psycopg
 
     with psycopg.connect(DSN) as conn:
@@ -39,7 +40,9 @@ def pg(monkeypatch):
 def test_ship_inserts_and_anchors(pg):
     _seed(3)
     inserted, head = ship.ship()
-    assert inserted == 3 and head == store.head()
+    head_val = store.head()
+    assert head_val is not None
+    assert inserted == 3 and head == head_val
     assert ship.last_anchor() == head
     # idempotent: nothing new
     inserted2, _ = ship.ship()
@@ -48,7 +51,9 @@ def test_ship_inserts_and_anchors(pg):
     import psycopg
 
     with psycopg.connect(pg) as conn:
-        assert conn.execute("SELECT count(*) FROM chain_heads").fetchone()[0] == 2
+        chain_heads_count = conn.execute("SELECT count(*) FROM chain_heads").fetchone()
+        assert chain_heads_count is not None
+        assert chain_heads_count[0] == 2
 
 
 @needs_pg
@@ -59,8 +64,12 @@ def test_ship_rebuild_replays_but_keeps_anchors(pg):
     import psycopg
 
     with psycopg.connect(pg) as conn:
-        assert conn.execute("SELECT count(*) FROM factory_events").fetchone()[0] == 2
-        assert conn.execute("SELECT count(*) FROM chain_heads").fetchone()[0] == 2
+        events_count = conn.execute("SELECT count(*) FROM factory_events").fetchone()
+        assert events_count is not None
+        assert events_count[0] == 2
+        heads_count = conn.execute("SELECT count(*) FROM chain_heads").fetchone()
+        assert heads_count is not None
+        assert heads_count[0] == 2
     assert inserted == 2
 
 
@@ -79,7 +88,9 @@ def test_ship_promotes_query_columns(pg):
 
 def test_verify_against_anchor_passes_and_fails(monkeypatch):
     _seed(3)
-    seq, head_hash = store.head()
+    head = store.head()
+    assert head is not None
+    seq, head_hash = head
     monkeypatch.setattr(ship, "last_anchor", lambda dsn=None: (seq, head_hash))
     assert main(["verify", "--against-anchor"]) == 0
     monkeypatch.setattr(ship, "last_anchor", lambda dsn=None: (seq, "f" * 64))
