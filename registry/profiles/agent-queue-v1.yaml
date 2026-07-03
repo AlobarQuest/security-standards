@@ -1,0 +1,15 @@
+schema: authority-profile/v1
+profile: agent-queue-v1
+description: Open Engine pilot runner — proposal-only work off the Linear Agent Queue; nothing outward, nothing infra.
+capabilities:
+  - repository_read
+  - task_claim
+  - event_emit
+prohibited:
+  - infra_mutation
+  - merge_to_main
+  - change_approval
+  - secret_write
+  - credential_create
+  - credential_revoke
+  - outward_publish

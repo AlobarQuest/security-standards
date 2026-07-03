@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: factory-runner
+version: 1
+status: reserved
+runtime: github-actions
+operator: devon
+environment: github-actions
+description: Phase-4 factory runner (generalized conformance runner) — identity shape defined by WS-1.2; wiring lands with Phase 4 (master plan WS-4.1).
+authority_profile: factory-runner-v1
+capabilities: []
+prohibited: []

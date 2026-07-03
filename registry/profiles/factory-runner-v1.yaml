@@ -1,0 +1,17 @@
+schema: authority-profile/v1
+profile: factory-runner-v1
+description: Phase-4 sandboxed GitHub Actions runner — tool-scoped work units ending in a PR; reserved until Phase 4.
+capabilities:
+  - repository_read
+  - repository_write
+  - test_execution
+  - pr_open
+  - event_emit
+prohibited:
+  - infra_mutation
+  - merge_to_main
+  - change_approval
+  - secret_write
+  - credential_create
+  - credential_revoke
+  - outward_publish

@@ -1,0 +1,20 @@
+schema: authority-profile/v1
+profile: interactive-dev-v1
+description: Claude Code sessions on the mini — full dev loop + gated infra tools; merges and approvals stay with Devon.
+capabilities:
+  - repository_read
+  - repository_write
+  - test_execution
+  - pr_open
+  - event_emit
+  - infra_mutation
+  - drift_detection
+  - change_filing
+  - secret_read
+  - secret_write
+  - email_send
+prohibited:
+  - merge_to_main
+  - change_approval
+  - credential_create
+  - credential_revoke

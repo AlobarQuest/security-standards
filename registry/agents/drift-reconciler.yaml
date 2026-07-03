@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: drift-reconciler
+version: 1
+status: active
+runtime: node-executor
+operator: devon
+environment: mini
+description: change-manager sync/watchdog — deterministic drift detection and item filing (no LLM).
+authority_profile: drift-sync-v1
+capabilities: []
+prohibited: []

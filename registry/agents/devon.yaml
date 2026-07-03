@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: devon
+version: 1
+status: active
+runtime: human
+operator: devon
+environment: any
+description: Devon Watkins — solo operator; any SSO email maps here. Human decisions only.
+authority_profile: human-operator-v1
+capabilities: []
+prohibited: []

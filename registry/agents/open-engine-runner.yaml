@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: open-engine-runner
+version: 1
+status: active
+runtime: claude-code
+operator: devon
+environment: mini
+description: WS-0.6 Open Engine pilot runner working the Linear Agent Queue (one task per run). Packet-internal agent_code devon-primary-agent maps to this registry id.
+authority_profile: agent-queue-v1
+capabilities: []
+prohibited: []

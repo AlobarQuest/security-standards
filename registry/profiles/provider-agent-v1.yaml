@@ -1,0 +1,16 @@
+schema: authority-profile/v1
+profile: provider-agent-v1
+description: Gated claude -p provider agents — extend their own repo on review branches; must not touch live infrastructure.
+capabilities:
+  - repository_read
+  - repository_write
+  - test_execution
+  - event_emit
+prohibited:
+  - infra_mutation
+  - merge_to_main
+  - change_approval
+  - secret_write
+  - credential_create
+  - credential_revoke
+  - outward_publish

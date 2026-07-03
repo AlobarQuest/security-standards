@@ -1,0 +1,16 @@
+schema: authority-profile/v1
+profile: security-window-v1
+description: Plan-hash-gated security execution (WS-0.7 rotation lane) — BWS updates + verification; create/revoke stay with Devon.
+capabilities:
+  - infra_mutation
+  - secret_read
+  - secret_write
+  - email_send
+  - event_emit
+prohibited:
+  - repository_write
+  - merge_to_main
+  - change_approval
+  - credential_create
+  - credential_revoke
+  - outward_publish

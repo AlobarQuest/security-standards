@@ -1,0 +1,13 @@
+schema: authority-profile/v1
+profile: infra-window-v1
+description: 4AM change-window execution of Devon-approved infra changes; approval and credential lifecycle excluded.
+capabilities:
+  - infra_mutation
+  - event_emit
+prohibited:
+  - repository_write
+  - merge_to_main
+  - change_approval
+  - credential_create
+  - credential_revoke
+  - outward_publish

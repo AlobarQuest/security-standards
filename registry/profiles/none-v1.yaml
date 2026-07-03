@@ -1,0 +1,5 @@
+schema: authority-profile/v1
+profile: none-v1
+description: No authority claims — label-only identities (unmappable source actors).
+capabilities: []
+prohibited: []

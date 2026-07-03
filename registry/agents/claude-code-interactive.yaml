@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: claude-code-interactive
+version: 1
+status: active
+runtime: claude-code
+operator: devon
+environment: mini
+description: A Claude Code session launched from Devon's shell (FACTORY_AGENT_ID set in ~/.zshenv). Identifies the launch channel, not the work done.
+authority_profile: interactive-dev-v1
+capabilities: []
+prohibited: []

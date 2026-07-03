@@ -1,0 +1,19 @@
+schema: capability-vocabulary/v1
+terms:
+  repository_read: read code/files in a repo working tree
+  repository_write: create or modify files and commits in a repo working tree
+  test_execution: run test suites and linters
+  pr_open: open pull requests (never merge)
+  merge_to_main: merge PRs / push to a default branch
+  event_emit: append events to the factory-events store
+  infra_mutation: mutate live infrastructure (Coolify, VPS, DNS, Hetzner) via gated tools
+  drift_detection: scan live infra/config and detect drift against standards
+  change_filing: file change items into change-manager for approval
+  change_approval: approve or reject change-manager items
+  secret_read: read secrets from BWS/Keychain at runtime
+  secret_write: write or update secrets in BWS
+  credential_create: mint new credentials at a provider console
+  credential_revoke: revoke credentials at a provider console
+  email_send: send outbound email
+  outward_publish: publish outward-facing content (listings, posts, public docs)
+  task_claim: claim work items from a queue (Linear Agent Queue, orchestrator)

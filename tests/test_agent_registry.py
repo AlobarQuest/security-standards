@@ -88,3 +88,11 @@ def test_effective_authority_unknown_agent_raises(tmp_path):
     reg = write_registry(tmp_path / "reg")
     with pytest.raises(RegistryError):
         effective_authority("nobody", reg)
+
+
+def test_real_registry_validates_and_covers_ws11_vocabulary():
+    assert validate_registry() == []
+    from agent_registry.registry import registered_ids
+    # one-for-one supersession of the WS-1.1 provisional vocabulary
+    assert {"devon", "claude-code-unattributed", "change-window-agent", "security-executor",
+            "drift-reconciler", "open-engine-runner", "unknown"} <= registered_ids()

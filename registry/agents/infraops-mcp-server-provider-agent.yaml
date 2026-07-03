@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: infraops-mcp-server-provider-agent
+version: 1
+status: active
+runtime: claude-p-headless
+operator: devon
+environment: mini
+description: The gated provider agent inside infraops-mcp-server (bin/provider-agent) — adds/extends MCP tools on review branches; must not run against live infrastructure.
+authority_profile: provider-agent-v1
+capabilities: []
+prohibited: []

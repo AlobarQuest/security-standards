@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: unknown
+version: 1
+status: active
+runtime: unknown
+operator: devon
+environment: any
+description: Fallback for source actors that cannot be mapped (e.g. change-manager's generic api actor). A label, not a runtime.
+authority_profile: none-v1
+capabilities: []
+prohibited: []

@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: change-window-agent
+version: 1
+status: active
+runtime: node-executor
+operator: devon
+environment: mini
+description: The Sonnet tool-use agent executing Devon-approved Coolify changes in the 4AM window (curated tool loop, pre-validate, post-verify-or-revert). Until WS-1.2, change-manager events conflated this with security-executor.
+authority_profile: infra-window-v1
+capabilities: []
+prohibited: []

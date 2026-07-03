@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: security-executor
+version: 1
+status: active
+runtime: node-executor
+operator: devon
+environment: mini
+description: The no-LLM, plan-hash-gated executor for approved security changes (WS-0.7 credential-rotation lane), sharing the 4AM window process with change-window-agent.
+authority_profile: security-window-v1
+capabilities: []
+prohibited: []
