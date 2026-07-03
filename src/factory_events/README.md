@@ -11,8 +11,8 @@ nightly Postgres projection. Spec:
 
 - `emit --actor A --action x.y --result success|failure|unknown --ref NAME
   [--target T] [--correlation-id C] [--evidence-json '{...}']` — append one
-  direct event. **This is the WS-1.2 seam:** runtimes/executors declare their
-  identity by emitting events with their registered actor id.
+  direct event. Runtimes/executors declare identity by emitting with their
+  registered actor id (validated against `registry/`).
 - `adapt --source high-power|change-manager|all [--reanchor]` — translate
   source logs (watermarked, idempotent; `--reanchor` accepts a rewritten
   high-power source file and re-ingests with event_id dedupe).
@@ -22,20 +22,15 @@ nightly Postgres projection. Spec:
 - `ship [--rebuild]` — upsert into the projection + anchor the current head.
   `--rebuild` truncates `factory_events` (never `chain_heads`) and replays.
 
-## Provisional actor vocabulary (until WS-1.2's registry)
+## Actor identity — the agent registry (WS-1.2)
 
-| actor | meaning |
-|---|---|
-| `claude-code-unattributed` | any Claude Code session on the mini — the high-power hook cannot distinguish interactive from headless; `correlation_id` carries the session UUID |
-| `change-window-agent` | change-manager `executor` events — conflates the window agent and the 4AM security executor (both run in the window lane); WS-1.2 separates them |
-| `drift-reconciler` | change-manager `sync` / `watchdog` events |
-| `security-executor` | reserved for direct emits from the 4AM executor |
-| `open-engine-runner` | reserved for the WS-0.6 pilot runner |
-| `devon` | human decisions (any SSO email — solo operator) |
-| `unknown` | unmappable source actors (e.g. change-manager `api`) |
-
-Raw source actor strings are always preserved verbatim in
-`evidence[0].record`; the envelope actor is the honest mapping, never a guess.
+Actors are validated against the agent-identity registry at `registry/`
+(`PYTHONPATH=src python3 -m agent_registry list|authority <id>`), which
+supersedes the provisional vocabulary this section used to hold. Direct emits
+with an unregistered actor are rejected; adapters fall back to
+`claude-code-unattributed` / legacy mappings and always preserve the raw source
+actor verbatim in `evidence[0].record`. See `registry/README.md` for the
+authority model (ability / policy / task-authority / approval).
 
 ## Runtime config — `~/.factory/env` (chmod 600, never tracked)
 
