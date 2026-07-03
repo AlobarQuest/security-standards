@@ -52,14 +52,16 @@ def test_actor_and_result_mapping_table():
         _raw(2, "failed", "executor"),
         _raw(3, "pr_linked", "api"),
         _raw(4, "stale_handoff", "watchdog"),
-    ], 4: []}
+        _raw(5, "approved", "devon"),
+    ], 5: []}
     change_manager.adapt(fetch=_fake_fetch(pages))
     events = [r["event"] for r in store.iter_records()]
     assert [e["actor"] for e in events] == [
-        "change-window-agent", "change-window-agent", "unknown", "drift-reconciler",
+        "change-window-agent", "change-window-agent", "unknown", "drift-reconciler", "devon",
     ]
-    assert [e["result"] for e in events] == ["success", "failure", "unknown", "unknown"]
-    assert all(e["authority_grant"] is None for e in events)
+    assert [e["result"] for e in events] == ["success", "failure", "unknown", "unknown", "success"]
+    assert events[4]["authority_grant"]["approver"] == "devon"
+    assert all(e["authority_grant"] is None for e in events[:4])
 
 
 def test_watermark_resumes_from_last_id():

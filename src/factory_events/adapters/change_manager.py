@@ -25,6 +25,7 @@ _ACTOR_MAP = {
     "sync": "drift-reconciler",
     "watchdog": "drift-reconciler",
     "executor": "change-window-agent",
+    "devon": "devon",
 }
 _RESULT_MAP = {"applied": "success", "approved": "success", "failed": "failure"}
 _GRANT_TYPES = {"approved"}
