@@ -80,10 +80,47 @@ def append_event(event: dict) -> dict:
     return record
 
 
-def verify_chain(path: Path | None = None) -> list[str]:
+def _parse_records(path: Path, tolerate_torn_tail: bool = False) -> tuple[list[dict], list[str]]:
+    """Parse records from path, handling unparseable lines.
+
+    Returns (records, errors). If errors is non-empty, records is incomplete.
+    If tolerate_torn_tail is True, silently drops one unparseable final line.
+    """
     errors: list[str] = []
+    raw_lines = []
+    with path.open() as fh:
+        for raw in fh:
+            raw = raw.strip()
+            if raw:
+                raw_lines.append(raw)
+
+    records = []
+    for i, raw in enumerate(raw_lines):
+        try:
+            records.append(json.loads(raw))
+        except json.JSONDecodeError as exc:
+            # If this is the last line and tolerate_torn_tail is set, drop it silently.
+            if tolerate_torn_tail and i == len(raw_lines) - 1:
+                break
+            # Any other unparseable line is an error.
+            errors.append(f"line {i + 1}: unparseable JSON ({exc})")
+            break
+    return records, errors
+
+
+def verify_chain(path: Path | None = None, tolerate_torn_tail: bool = False) -> list[str]:
+    errors: list[str] = []
+    path = path or events_path()
+    if not path.exists():
+        return errors
+
+    records, parse_errors = _parse_records(path, tolerate_torn_tail=tolerate_torn_tail)
+    if parse_errors:
+        return parse_errors
+
+    # Verify the parsed chain.
     expected_seq, expected_prev = 1, GENESIS
-    for rec in iter_records(path):
+    for rec in records:
         seq = rec.get("seq")
         if not isinstance(seq, int) or seq != expected_seq:
             errors.append(f"seq {seq}: expected seq {expected_seq} (line missing or reordered)")

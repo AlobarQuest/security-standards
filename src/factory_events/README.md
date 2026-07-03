@@ -44,6 +44,14 @@ Raw source actor strings are always preserved verbatim in
     FACTORY_DB_DSN=postgresql://factory_events:<from BWS>@127.0.0.1:5545/factory_events
     FACTORY_HC_PING_URL=<healthchecks.io ping url>  # optional
 
+## Recovery
+
+`~/.factory/` is in the nightly mini-host backup (dir tree; env EXCLUDED by policy —
+BWS is the secrets source of record). To recover: restore the tree from restic,
+re-materialize `~/.factory/env` from BWS per the config section (chmod 600), run
+`verify --tolerate-torn-tail` on the restored store (a mid-write copy may have one
+truncated final line — valid up to the last complete event), then `ship --rebuild`.
+
 ## Nightly
 
 `com.devon.factory-events` (launchd, 03:30) → `scripts/factory-events-nightly.sh`:

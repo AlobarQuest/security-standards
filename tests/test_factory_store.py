@@ -89,3 +89,23 @@ def test_verify_chain_reports_line_missing_event_key(tmp_path):
     path.write_text("\n".join(lines) + "\n")
     errors = store.verify_chain()
     assert errors and "seq 2" in errors[0]
+
+
+def test_verify_tolerates_torn_tail_when_flagged():
+    for n in range(3):
+        store.append_event(_event(n))
+    path = store.events_path()
+    with path.open("a") as fh:
+        fh.write('{"seq": 4, "prev_hash": "abc", "ha')  # torn mid-write, no newline
+    assert store.verify_chain() != []  # strict default: torn tail is an error
+    assert store.verify_chain(tolerate_torn_tail=True) == []
+
+
+def test_torn_middle_line_fails_even_with_flag():
+    for n in range(3):
+        store.append_event(_event(n))
+    path = store.events_path()
+    lines = path.read_text().splitlines()
+    lines[1] = lines[1][:20]  # torn middle line
+    path.write_text("\n".join(lines) + "\n")
+    assert store.verify_chain(tolerate_torn_tail=True) != []

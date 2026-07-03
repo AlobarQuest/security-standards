@@ -36,7 +36,8 @@ def _cmd_emit(args: argparse.Namespace) -> int:
 
 
 def _cmd_verify(args: argparse.Namespace) -> int:
-    errors = store.verify_chain()
+    tolerate_torn_tail = getattr(args, "tolerate_torn_tail", False)
+    errors = store.verify_chain(tolerate_torn_tail=tolerate_torn_tail)
     if errors:
         for err in errors:
             print(f"VERIFY FAIL: {err}", file=sys.stderr)
@@ -111,6 +112,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     verify = sub.add_parser("verify", help="verify the full hash chain + schemas")
     verify.add_argument("--against-anchor", action="store_true")
+    verify.add_argument("--tolerate-torn-tail", action="store_true",
+                        help="accept one truncated final line (restored-copy verification)")
     verify.set_defaults(func=_cmd_verify)
 
     adapt = sub.add_parser("adapt", help="translate source logs into the store")
