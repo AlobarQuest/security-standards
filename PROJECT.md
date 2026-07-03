@@ -8,7 +8,10 @@ version: 0.1.0
 version_source: pyproject
 updated: '2026-06-26'
 foundation: true
-applicable_standards: [project, security, code]
+applicable_standards:
+- project
+- security
+- code
 ---
 
 ## Backlog
@@ -22,4 +25,5 @@ applicable_standards: [project, security, code]
 - [ ] (P2) Build tooling to make Coolify/GitHub deploy-key (and credential) rotations bearable — the enabler Devon wants before clearing deferred key-rotation items. Should make 'rotate a deploy key + swap on Coolify + GitHub + redeploy + verify' a one-command, transcript-safe flow (no reading deploy logs, which leak the key). Unblocks the deferred veritok deploy-key rotation. — added 2026-06-26
 - [x] (P2) Onboard to code-standards (foundation matrix red: code.not-onboarded) — added 2026-07-02
 
+- [ ] (P2) Scanner: anchor .security-scan-allow.toml resolution to the git repo root, not scan cwd — scanning from a subdirectory reports allowlisted=0 and unmasks the repo's 12 allowlisted historical findings as 5 false BLOCKs (bws-scan-gate hit this when session cwd was deploy/factory-events-db) — added 2026-07-03
 ## Future plans
