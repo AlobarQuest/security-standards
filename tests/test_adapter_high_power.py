@@ -98,3 +98,26 @@ def test_cli_reports_source_error(tmp_path, monkeypatch, capsys):
     from factory_events.cli import main
     assert main(["adapt", "--source", "high-power"]) == 1
     assert "ADAPT FAIL (high-power)" in capsys.readouterr().err
+
+
+def test_governance_bypass_record_maps(source):
+    with source.open("a") as fh:
+        fh.write(json.dumps({
+            "action": "code-standards-bypass", "repo": "/Users/devon/Projects/x",
+            "note": "CODE_STANDARDS_BYPASS=1 was set; quality gate bypassed",
+            "timestamp": "2026-06-28T12:03:10Z",
+        }) + "\n")
+    count = high_power.adapt(source=source)
+    assert count == 4
+    ev = list(store.iter_records())[-1]["event"]
+    assert ev["action"] == "governance.code-standards-bypass"
+    assert ev["target"] == "/Users/devon/Projects/x"
+    assert ev["result"] == "success"
+
+
+def test_record_with_neither_tool_nor_action_raises(source):
+    high_power.adapt(source=source)
+    with source.open("a") as fh:
+        fh.write('{"timestamp":"2026-06-28T12:03:10Z","mystery":"x"}\n')
+    with pytest.raises(high_power.SourceError):
+        high_power.adapt(source=source)

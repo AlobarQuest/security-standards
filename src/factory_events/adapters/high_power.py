@@ -1,5 +1,8 @@
 """Adapter: ~/.claude/audit/high-power-actions.jsonl -> factory-events store.
 
+Two record writers: (1) PostToolUse hook appends tool records {tool, timestamp, ...};
+(2) quality-gate.sh appends governance records {action, timestamp, ...}.
+
 Watermark = {line_count, content_sha256} where content_sha256 hashes all processed
 lines — any rewrite in the ingested region is detected. A hash mismatch means the
 source was rewritten/rotated: fail loudly; --reanchor re-ingests from line 0 and the
@@ -69,19 +72,38 @@ def _extract_target(args_summary: str) -> str | None:
 
 def _map_line(raw_line: str, lineno: int) -> dict:
     raw = json.loads(raw_line)
-    tool = raw["tool"]
-    name = tool.split("__", 2)[2] if tool.startswith("mcp__") and tool.count("__") >= 2 else tool
-    return make_event(
-        event_id=deterministic_event_id(SYSTEM, raw_line),
-        timestamp=raw["timestamp"],
-        actor="claude-code-unattributed",
-        action=f"tool.{name.lower()}",
-        target=_extract_target(raw.get("args_summary", "")),
-        result="unknown",
-        evidence=[{"type": "source-record", "record": raw}],
-        correlation_id=raw.get("session_id"),
-        source={"system": SYSTEM, "ref": f"line:{lineno}"},
-    )
+    # Branch on record shape: tool records vs. governance records
+    if "tool" in raw:
+        tool = raw["tool"]
+        if tool.startswith("mcp__") and tool.count("__") >= 2:
+            name = tool.split("__", 2)[2]
+        else:
+            name = tool
+        return make_event(
+            event_id=deterministic_event_id(SYSTEM, raw_line),
+            timestamp=raw["timestamp"],
+            actor="claude-code-unattributed",
+            action=f"tool.{name.lower()}",
+            target=_extract_target(raw.get("args_summary", "")),
+            result="unknown",
+            evidence=[{"type": "source-record", "record": raw}],
+            correlation_id=raw.get("session_id"),
+            source={"system": SYSTEM, "ref": f"line:{lineno}"},
+        )
+    elif "action" in raw:
+        return make_event(
+            event_id=deterministic_event_id(SYSTEM, raw_line),
+            timestamp=raw["timestamp"],
+            actor="claude-code-unattributed",
+            action=f"governance.{raw['action']}",
+            target=raw.get("repo"),
+            result="success",
+            evidence=[{"type": "source-record", "record": raw}],
+            correlation_id=raw.get("session_id"),
+            source={"system": SYSTEM, "ref": f"line:{lineno}"},
+        )
+    else:
+        raise KeyError("Record has neither 'tool' nor 'action' key")
 
 
 def adapt(source: Path | None = None, reanchor: bool = False) -> int:

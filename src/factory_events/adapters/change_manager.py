@@ -93,7 +93,10 @@ def _http_fetch(after_id: int, limit: int) -> list[dict]:
     query = urllib.parse.urlencode({"after_id": after_id, "limit": limit})
     req = urllib.request.Request(
         f"{base_url.rstrip('/')}/api/events?{query}",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "User-Agent": "factory-events-adapter/1 (+security-standards WS-1.1)",
+        },
     )
     with urllib.request.urlopen(req, timeout=30) as resp:  # https URL from config
         return json.loads(resp.read())["events"]
