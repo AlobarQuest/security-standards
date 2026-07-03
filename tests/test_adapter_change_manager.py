@@ -2,6 +2,7 @@ import pytest
 
 from factory_events import store
 from factory_events.adapters import change_manager
+from factory_events.adapters.change_manager import _map_actor
 
 
 @pytest.fixture(autouse=True)
@@ -91,3 +92,16 @@ def test_non_advancing_page_raises():
         return [_raw(0)]  # id never exceeds cursor
     with pytest.raises(RuntimeError, match="did not advance"):
         change_manager.adapt(fetch=bad_fetch)
+
+
+def test_registered_actor_passes_through():
+    assert _map_actor("security-executor") == "security-executor"
+    assert _map_actor("change-window-agent") == "change-window-agent"
+
+
+def test_legacy_executor_still_maps_to_window_agent():
+    assert _map_actor("executor") == "change-window-agent"
+
+
+def test_unregistered_unmapped_actor_is_unknown():
+    assert _map_actor("api") == "unknown"
