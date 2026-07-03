@@ -76,3 +76,16 @@ def test_empty_store_verifies_and_has_no_head():
     assert store.verify_chain() == []
     assert store.head() is None
     assert store.event_ids() == set()
+
+
+def test_verify_chain_reports_line_missing_event_key(tmp_path):
+    for n in range(3):
+        store.append_event(_event(n))
+    path = store.events_path()
+    lines = path.read_text().splitlines()
+    doctored = json.loads(lines[1])
+    del doctored["event"]
+    lines[1] = json.dumps(doctored, sort_keys=True, separators=(",", ":"))
+    path.write_text("\n".join(lines) + "\n")
+    errors = store.verify_chain()
+    assert errors and "seq 2" in errors[0]

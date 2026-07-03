@@ -73,8 +73,8 @@ def append_event(event: dict) -> dict:
             "hash": _line_hash(seq, prev_hash, event),
             "event": event,
         }
-        with path.open("a") as fh:
-            fh.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+        with path.open("ab") as fh:
+            fh.write(canonical_json(record) + b"\n")
             fh.flush()
             os.fsync(fh.fileno())
     return record
@@ -85,17 +85,21 @@ def verify_chain(path: Path | None = None) -> list[str]:
     expected_seq, expected_prev = 1, GENESIS
     for rec in iter_records(path):
         seq = rec.get("seq")
-        if seq != expected_seq:
+        if not isinstance(seq, int) or seq != expected_seq:
             errors.append(f"seq {seq}: expected seq {expected_seq} (line missing or reordered)")
             return errors
         if rec.get("prev_hash") != expected_prev:
             errors.append(f"seq {seq}: prev_hash mismatch (chain broken)")
             return errors
-        if rec.get("hash") != _line_hash(seq, rec["prev_hash"], rec["event"]):
+        event = rec.get("event")
+        if not isinstance(event, dict):
+            errors.append(f"seq {seq}: event missing or not an object (line tampered)")
+            return errors
+        if rec.get("hash") != _line_hash(seq, rec["prev_hash"], event):
             errors.append(f"seq {seq}: hash mismatch (line tampered)")
             return errors
         try:
-            validate_event(rec["event"])
+            validate_event(event)
         except Exception as exc:  # noqa: BLE001 — report, don't crash the walk
             errors.append(f"seq {seq}: schema violation: {exc}")
             return errors
