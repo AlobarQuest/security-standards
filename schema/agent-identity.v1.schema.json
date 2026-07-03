@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-identity.v1.schema.json",
+  "title": "agent-identity/v1",
+  "type": "object",
+  "required": ["schema", "agent_id", "version", "status", "runtime", "operator",
+               "environment", "description", "authority_profile", "capabilities", "prohibited"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "agent-identity/v1"},
+    "agent_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$"},
+    "version": {"type": "integer", "minimum": 1},
+    "status": {"enum": ["active", "reserved", "retired"]},
+    "runtime": {"enum": ["claude-code", "claude-p-headless", "node-executor", "github-actions", "human", "unknown"]},
+    "operator": {"type": "string", "minLength": 1},
+    "environment": {"enum": ["mini", "vps", "github-actions", "any"]},
+    "description": {"type": "string", "minLength": 1},
+    "authority_profile": {"type": "string", "pattern": "^[a-z0-9-]+-v[0-9]+$"},
+    "capabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "prohibited": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+  }
+}

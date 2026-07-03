@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: claude-code-unattributed
+version: 1
+status: active
+runtime: claude-code
+operator: devon
+environment: mini
+description: Honest fallback — a Claude Code session on the mini that declared no identity. All pre-WS-1.2 high-power events carry this label; session UUID in correlation_id.
+authority_profile: interactive-dev-v1
+capabilities: []
+prohibited: []

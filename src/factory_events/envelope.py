@@ -46,6 +46,16 @@ def validate_event(event: dict) -> None:
         raise EnvelopeError(f"invalid factory-event at {where}: {first.message}")
 
 
+def _assert_registered_actor(actor: str) -> None:
+    # Lazy import: registry lookup (PyYAML) only loads on event construction.
+    from agent_registry.registry import registered_ids
+
+    if actor not in registered_ids():
+        raise EnvelopeError(
+            f"actor {actor!r} is not a registered agent_id (see registry/agents/)"
+        )
+
+
 def make_event(
     *,
     actor: str,
@@ -76,5 +86,6 @@ def make_event(
         "correlation_id": correlation_id,
         "source": source,
     }
+    _assert_registered_actor(actor)
     validate_event(event)
     return event

@@ -51,8 +51,12 @@ def _save_watermark(last_id: int) -> None:
 
 
 def _map_actor(raw_actor: str) -> str:
+    from agent_registry.registry import registered_ids
+
+    if raw_actor in registered_ids():
+        return raw_actor  # WS-1.2 threaded identity — verbatim
     if raw_actor in _ACTOR_MAP:
-        return _ACTOR_MAP[raw_actor]
+        return _ACTOR_MAP[raw_actor]  # legacy/pre-split strings
     if "@" in raw_actor:
         return "devon"  # solo operator: any SSO email is Devon
     return "unknown"

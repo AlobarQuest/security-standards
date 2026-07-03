@@ -15,6 +15,8 @@ jobs:
       - run: pip install -e .
       - name: Install test deps
         run: pip install -e ".[dev]"
+      - name: Agent registry validation (fails on invalid registry)
+        run: python -m agent_registry validate
       - name: Read-guard tests
         run: python -m pytest tests/test_read_guard.py tests/test_read_guard_selfcheck.py -v
       - name: Security scan (fails on BLOCK)

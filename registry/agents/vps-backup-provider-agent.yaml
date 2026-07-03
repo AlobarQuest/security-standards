@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: vps-backup-provider-agent
+version: 1
+status: active
+runtime: claude-p-headless
+operator: devon
+environment: mini
+description: The gated provider agent inside vps-backup (bin/provider-agent) — extends the backup system on review branches for consumer agents.
+authority_profile: provider-agent-v1
+capabilities: []
+prohibited: []

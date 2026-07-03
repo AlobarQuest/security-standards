@@ -1,0 +1,22 @@
+schema: authority-profile/v1
+profile: human-operator-v1
+description: Devon — the human root of authority; approvals, merges, credential lifecycle.
+capabilities:
+  - repository_read
+  - repository_write
+  - test_execution
+  - pr_open
+  - merge_to_main
+  - event_emit
+  - infra_mutation
+  - drift_detection
+  - change_filing
+  - change_approval
+  - secret_read
+  - secret_write
+  - credential_create
+  - credential_revoke
+  - email_send
+  - outward_publish
+  - task_claim
+prohibited: []

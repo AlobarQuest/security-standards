@@ -70,6 +70,16 @@ def _extract_target(args_summary: str) -> str | None:
     return None
 
 
+def _actor(raw: dict) -> str:
+    """Stamped identity if registered; honest fallback otherwise (raw stays in evidence)."""
+    from agent_registry.registry import registered_ids
+
+    stamped = raw.get("actor")
+    if isinstance(stamped, str) and stamped in registered_ids():
+        return stamped
+    return "claude-code-unattributed"
+
+
 def _map_line(raw_line: str, lineno: int) -> dict:
     raw = json.loads(raw_line)
     # Branch on record shape: tool records vs. governance records
@@ -82,7 +92,7 @@ def _map_line(raw_line: str, lineno: int) -> dict:
         return make_event(
             event_id=deterministic_event_id(SYSTEM, raw_line),
             timestamp=raw["timestamp"],
-            actor="claude-code-unattributed",
+            actor=_actor(raw),
             action=f"tool.{name.lower()}",
             target=_extract_target(raw.get("args_summary", "")),
             result="unknown",
@@ -94,7 +104,7 @@ def _map_line(raw_line: str, lineno: int) -> dict:
         return make_event(
             event_id=deterministic_event_id(SYSTEM, raw_line),
             timestamp=raw["timestamp"],
-            actor="claude-code-unattributed",
+            actor=_actor(raw),
             action=f"governance.{raw['action']}",
             target=raw.get("repo"),
             result="success",

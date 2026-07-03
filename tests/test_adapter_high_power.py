@@ -24,6 +24,15 @@ def source(tmp_path) -> Path:
     return src
 
 
+def adapt_lines(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lines: list[str]) -> list[dict]:
+    """Write raw JSONL lines to a tmp source, adapt them, and return the stored events."""
+    src = tmp_path / "adapt_lines_src.jsonl"
+    src.write_text("\n".join(lines) + "\n")
+    monkeypatch.setenv("FACTORY_EVENTS_HOME", str(tmp_path / "factory_adapt_lines"))
+    high_power.adapt(source=src)
+    return [record["event"] for record in store.iter_records()]
+
+
 def test_adapt_maps_fields(source):
     count = high_power.adapt(source=source)
     assert count == 3
@@ -121,3 +130,27 @@ def test_record_with_neither_tool_nor_action_raises(source):
         fh.write('{"timestamp":"2026-06-28T12:03:10Z","mystery":"x"}\n')
     with pytest.raises(high_power.SourceError):
         high_power.adapt(source=source)
+
+
+def test_stamped_registered_actor_is_used(tmp_path, monkeypatch):
+    line = json.dumps({"timestamp": "2026-07-03T04:00:00Z", "tool": "vps_exec",
+                       "session_id": "s1", "args_summary": "{}",
+                       "actor": "vps-backup-provider-agent", "provenance": "unknown"})
+    events = adapt_lines(tmp_path, monkeypatch, [line])
+    assert events[0]["actor"] == "vps-backup-provider-agent"
+
+
+def test_stamped_unregistered_actor_falls_back(tmp_path, monkeypatch):
+    line = json.dumps({"timestamp": "2026-07-03T04:00:00Z", "tool": "vps_exec",
+                       "session_id": "s1", "args_summary": "{}",
+                       "actor": "typo-agent", "provenance": "unknown"})
+    events = adapt_lines(tmp_path, monkeypatch, [line])
+    assert events[0]["actor"] == "claude-code-unattributed"
+    assert events[0]["evidence"][0]["record"]["actor"] == "typo-agent"  # raw preserved
+
+
+def test_unstamped_record_falls_back(tmp_path, monkeypatch):
+    line = json.dumps({"timestamp": "2026-07-03T04:00:00Z", "tool": "vps_exec",
+                       "session_id": "s1", "args_summary": "{}", "provenance": "unknown"})
+    events = adapt_lines(tmp_path, monkeypatch, [line])
+    assert events[0]["actor"] == "claude-code-unattributed"

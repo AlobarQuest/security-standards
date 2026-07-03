@@ -1,0 +1,15 @@
+schema: authority-profile/v1
+profile: drift-sync-v1
+description: Deterministic drift detection + filing; observes and proposes, never mutates.
+capabilities:
+  - drift_detection
+  - change_filing
+  - email_send
+  - event_emit
+prohibited:
+  - infra_mutation
+  - merge_to_main
+  - change_approval
+  - secret_write
+  - credential_create
+  - credential_revoke

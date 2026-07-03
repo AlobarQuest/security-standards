@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "authority-profile.v1.schema.json",
+  "title": "authority-profile/v1",
+  "type": "object",
+  "required": ["schema", "profile", "description", "capabilities", "prohibited"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "authority-profile/v1"},
+    "profile": {"type": "string", "pattern": "^[a-z0-9-]+-v[0-9]+$"},
+    "description": {"type": "string", "minLength": 1},
+    "capabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "prohibited": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+  }
+}
