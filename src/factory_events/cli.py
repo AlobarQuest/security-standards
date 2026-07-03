@@ -44,8 +44,8 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     current = store.head()
     print(f"chain ok: {current[0] if current else 0} events"
           + (f", head {current[1]}" if current else ""))
-    return 0
     # Task 7 extends verify with --against-anchor
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -72,5 +72,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    try:
+        args = build_parser().parse_args(argv)
+    except SystemExit as exc:  # argparse: 0 for --help, 2 for usage errors
+        return 0 if exc.code == 0 else 1
     return args.func(args)

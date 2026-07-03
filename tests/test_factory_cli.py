@@ -52,3 +52,13 @@ def test_verify_ok_and_failure(capsys, tmp_path):
     line["event"]["actor"] = "mallory"
     path.write_text(json.dumps(line) + "\n")
     assert main(["verify"]) == 1
+
+
+def test_usage_error_exits_1(capsys):
+    rc = main(["emit", "--actor", "devon", "--action", "factory.x",
+               "--result", "bogus", "--ref", "manual"])
+    assert rc == 1
+
+
+def test_help_exits_0(capsys):
+    assert main(["--help"]) == 0
