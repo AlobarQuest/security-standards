@@ -8,10 +8,22 @@ version: 0.1.0
 version_source: pyproject
 updated: '2026-06-26'
 foundation: true
+foundation_contract: 1
 applicable_standards:
-- project
-- security
-- code
+  project: '1.0'
+  security: '1.0'
+  code: '1.0'
+required_checks:
+- id: quality
+  executor: github-actions:quality.yml
+- id: security-scan
+  executor: github-actions:security-scan.yml
+- id: session-scan-gate
+  executor: hook:bws-scan-gate.sh
+- id: weekly-scan
+  executor: launchagent:com.devon.security-scan
+- id: factory-events-nightly
+  executor: launchagent:com.devon.factory-events
 ---
 
 ## Backlog
