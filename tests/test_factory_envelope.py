@@ -58,3 +58,25 @@ def test_validate_rejects_non_z_timestamp():
 
 def test_canonical_json_sorted_and_compact():
     assert envelope.canonical_json({"b": 1, "a": [1, 2]}) == b'{"a":[1,2],"b":1}'
+
+
+def test_make_event_rejects_unregistered_actor():
+    with pytest.raises(envelope.EnvelopeError, match="not a registered agent_id"):
+        envelope.make_event(
+            actor="totally-invented",
+            action="tool.test",
+            result="unknown",
+            timestamp="2026-07-03T00:00:00Z",
+            source={"system": "direct", "ref": "test"},
+        )
+
+
+def test_make_event_accepts_registered_actor_any_status():
+    event = envelope.make_event(
+        actor="factory-runner",  # status: reserved — must still validate
+        action="tool.test",
+        result="unknown",
+        timestamp="2026-07-03T00:00:00Z",
+        source={"system": "direct", "ref": "test"},
+    )
+    assert event["actor"] == "factory-runner"
