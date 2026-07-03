@@ -38,4 +38,5 @@ required_checks:
 - [x] (P2) Onboard to code-standards (foundation matrix red: code.not-onboarded) — added 2026-07-02
 
 - [ ] (P2) Scanner: anchor .security-scan-allow.toml resolution to the git repo root, not scan cwd — scanning from a subdirectory reports allowlisted=0 and unmasks the repo's 12 allowlisted historical findings as 5 false BLOCKs (bws-scan-gate hit this when session cwd was deploy/factory-events-db) — added 2026-07-03
+- [ ] (P2) CI guard: STANDARD_VERSION must be bumped when the standard's rules change in a diff (WS-1.3 follow-up) — added 2026-07-03
 ## Future plans
