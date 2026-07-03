@@ -49,16 +49,24 @@ def _cmd_verify(args: argparse.Namespace) -> int:
 
 
 def _cmd_adapt(args: argparse.Namespace) -> int:
-    from factory_events.adapters import high_power
+    from factory_events.adapters import change_manager, high_power
 
-    try:
-        if args.source == "high-power":
+    failures = 0
+    if args.source in ("high-power", "all"):
+        try:
             count = high_power.adapt(reanchor=args.reanchor)
             print(f"high-power: {count} events appended")
-    except (high_power.WatermarkError, high_power.SourceError) as exc:
-        print(f"ADAPT FAIL (high-power): {exc}", file=sys.stderr)
-        return 1
-    return 0
+        except (high_power.WatermarkError, high_power.SourceError) as exc:
+            print(f"ADAPT FAIL (high-power): {exc}", file=sys.stderr)
+            failures += 1
+    if args.source in ("change-manager", "all"):
+        try:
+            count = change_manager.adapt()
+            print(f"change-manager: {count} events appended")
+        except (change_manager.ConfigError, OSError) as exc:
+            print(f"ADAPT FAIL (change-manager): {exc}", file=sys.stderr)
+            failures += 1
+    return 1 if failures else 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -80,7 +88,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify.set_defaults(func=_cmd_verify)
 
     adapt = sub.add_parser("adapt", help="translate source logs into the store")
-    adapt.add_argument("--source", required=True, choices=["high-power"])
+    adapt.add_argument("--source", required=True, choices=["high-power", "change-manager", "all"])
     adapt.add_argument("--reanchor", action="store_true")
     adapt.set_defaults(func=_cmd_adapt)
     # Task 7 extends here: ship
