@@ -4,7 +4,8 @@ version = "0.1.0"
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "jsonschema>=4.21"]
+events = ["jsonschema>=4.21", "psycopg[binary]>=3.1"]
 
 [project.scripts]
 security-scan = "security_scan.cli:main"

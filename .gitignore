@@ -11,6 +11,7 @@ id_*
 .DS_Store
 
 .venv/
+.venv-events/
 __pycache__/
 *.egg-info/
 .pytest_cache/
