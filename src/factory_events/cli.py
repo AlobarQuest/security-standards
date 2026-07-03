@@ -48,6 +48,19 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_adapt(args: argparse.Namespace) -> int:
+    from factory_events.adapters import high_power
+
+    try:
+        if args.source == "high-power":
+            count = high_power.adapt(reanchor=args.reanchor)
+            print(f"high-power: {count} events appended")
+    except high_power.WatermarkError as exc:
+        print(f"ADAPT FAIL: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="factory_events")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -66,7 +79,10 @@ def build_parser() -> argparse.ArgumentParser:
     verify = sub.add_parser("verify", help="verify the full hash chain + schemas")
     verify.set_defaults(func=_cmd_verify)
 
-    # Task 4 extends here: adapt
+    adapt = sub.add_parser("adapt", help="translate source logs into the store")
+    adapt.add_argument("--source", required=True, choices=["high-power"])
+    adapt.add_argument("--reanchor", action="store_true")
+    adapt.set_defaults(func=_cmd_adapt)
     # Task 7 extends here: ship
     return parser
 

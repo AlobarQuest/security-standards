@@ -62,3 +62,19 @@ def test_usage_error_exits_1(capsys):
 
 def test_help_exits_0(capsys):
     assert main(["--help"]) == 0
+
+
+def test_adapt_high_power_via_cli(tmp_path, monkeypatch, capsys):
+    src = tmp_path / "hp.jsonl"
+    record = {
+        "timestamp": "2026-07-02T23:33:35Z",
+        "tool": "mcp__infraops__vps_exec",
+        "session_id": "s",
+        "args_summary": "{}",
+        "provenance": "unknown (confirm at review: direct request vs inferred from read content)",
+    }
+    src.write_text(json.dumps(record) + "\n")
+    from factory_events.adapters import high_power
+    monkeypatch.setattr(high_power, "DEFAULT_SOURCE", src)
+    assert main(["adapt", "--source", "high-power"]) == 0
+    assert "1 events appended" in capsys.readouterr().out
