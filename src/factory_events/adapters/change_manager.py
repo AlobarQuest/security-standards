@@ -12,7 +12,7 @@ import os
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from factory_events import store
@@ -59,9 +59,11 @@ def _map_actor(raw_actor: str) -> str:
 
 def _normalize_ts(raw: str) -> str:
     ts = datetime.fromisoformat(raw)
-    naive = ts.replace(tzinfo=None) if ts.tzinfo else ts  # DB times are UTC
-    suffix = f".{naive.microsecond:06d}" if naive.microsecond else ""
-    return naive.strftime("%Y-%m-%dT%H:%M:%S") + suffix + "Z"
+    if ts.tzinfo:
+        ts = ts.astimezone(UTC).replace(tzinfo=None)
+    # naive timestamps are trusted as UTC (change-manager writes datetime.now(UTC))
+    suffix = f".{ts.microsecond:06d}" if ts.microsecond else ""
+    return ts.strftime("%Y-%m-%dT%H:%M:%S") + suffix + "Z"
 
 
 def _map_event(raw: dict) -> dict:
@@ -93,7 +95,7 @@ def _http_fetch(after_id: int, limit: int) -> list[dict]:
         f"{base_url.rstrip('/')}/api/events?{query}",
         headers={"Authorization": f"Bearer {token}"},
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 — https URL from config
+    with urllib.request.urlopen(req, timeout=30) as resp:  # https URL from config
         return json.loads(resp.read())["events"]
 
 
@@ -116,6 +118,11 @@ def adapt(fetch: Callable[[int, int], list[dict]] | None = None) -> int:
                 store.append_event(event)
                 known.add(event["event_id"])
                 appended += 1
-        after_id = page[-1]["id"]
+        last_id = page[-1]["id"]
+        if last_id <= after_id:
+            raise RuntimeError(
+                f"events page did not advance cursor (after_id={after_id}, last id={last_id})"
+            )
+        after_id = last_id
         _save_watermark(after_id)
     return appended

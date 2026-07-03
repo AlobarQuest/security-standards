@@ -75,3 +75,17 @@ def test_missing_config_fails_loudly(monkeypatch):
     monkeypatch.delenv("CM_M2M_TOKEN", raising=False)
     with pytest.raises(change_manager.ConfigError):
         change_manager.adapt()
+
+
+def test_normalize_ts_converts_non_utc_offsets():
+    pages = {0: [dict(_raw(1), at="2026-07-01T04:00:00+05:00")], 1: []}
+    change_manager.adapt(fetch=_fake_fetch(pages))
+    ev = list(store.iter_records())[0]["event"]
+    assert ev["timestamp"] == "2026-06-30T23:00:00Z"
+
+
+def test_non_advancing_page_raises():
+    def bad_fetch(after_id: int, limit: int) -> list[dict]:
+        return [_raw(0)]  # id never exceeds cursor
+    with pytest.raises(RuntimeError, match="did not advance"):
+        change_manager.adapt(fetch=bad_fetch)
