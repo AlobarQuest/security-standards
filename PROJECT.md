@@ -8,10 +8,22 @@ version: 0.1.0
 version_source: pyproject
 updated: '2026-06-26'
 foundation: true
+foundation_contract: 1
 applicable_standards:
-- project
-- security
-- code
+  project: '1.0'
+  security: '1.0'
+  code: '1.0'
+required_checks:
+- id: quality
+  executor: github-actions:quality.yml
+- id: security-scan
+  executor: github-actions:security-scan.yml
+- id: session-scan-gate
+  executor: hook:bws-scan-gate.sh
+- id: weekly-scan
+  executor: launchagent:com.devon.security-scan
+- id: factory-events-nightly
+  executor: launchagent:com.devon.factory-events
 ---
 
 ## Backlog
@@ -26,4 +38,5 @@ applicable_standards:
 - [x] (P2) Onboard to code-standards (foundation matrix red: code.not-onboarded) — added 2026-07-02
 
 - [ ] (P2) Scanner: anchor .security-scan-allow.toml resolution to the git repo root, not scan cwd — scanning from a subdirectory reports allowlisted=0 and unmasks the repo's 12 allowlisted historical findings as 5 false BLOCKs (bws-scan-gate hit this when session cwd was deploy/factory-events-db) — added 2026-07-03
+- [ ] (P2) CI guard: STANDARD_VERSION must be bumped when the standard's rules change in a diff (WS-1.3 follow-up) — added 2026-07-03
 ## Future plans
