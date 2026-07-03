@@ -50,7 +50,13 @@ Raw source actor strings are always preserved verbatim in
 BWS is the secrets source of record). To recover: restore the tree from restic,
 re-materialize `~/.factory/env` from BWS per the config section (chmod 600), run
 `verify --tolerate-torn-tail` on the restored store (a mid-write copy may have one
-truncated final line — valid up to the last complete event), then `ship --rebuild`.
+truncated final line — valid up to the last complete event).
+
+A torn final line must then be **removed** before the store accepts new work —
+`ship --rebuild`, `adapt`, and `emit` all use strict parsing and fail on a torn
+store. Repair it: keep only the first N complete lines (drop the trailing
+partial one), then re-run plain `verify` (no flag) — it must pass before
+resuming with `ship --rebuild`.
 
 ## Nightly
 

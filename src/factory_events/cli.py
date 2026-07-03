@@ -42,13 +42,14 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         for err in errors:
             print(f"VERIFY FAIL: {err}", file=sys.stderr)
         return 1
-    current = store.head()
+    records = store.parsed_records(tolerate_torn_tail=tolerate_torn_tail)
+    current = (records[-1]["seq"], records[-1]["hash"]) if records else None
     if getattr(args, "against_anchor", False):
         from factory_events import ship as ship_mod
 
         anchor = ship_mod.last_anchor()
         if anchor is not None:
-            seqs = {rec["seq"]: rec["hash"] for rec in store.iter_records()}
+            seqs = {rec["seq"]: rec["hash"] for rec in records}
             if seqs.get(anchor[0]) != anchor[1]:
                 print(f"VERIFY FAIL: anchored head (seq {anchor[0]}) not in chain — "
                       "store rewritten since last anchor", file=sys.stderr)

@@ -134,7 +134,7 @@ def adapt(source: Path | None = None, reanchor: bool = False) -> int:
             continue
         try:
             event = _map_line(raw_line, lineno=offset)
-        except (json.JSONDecodeError, KeyError, EnvelopeError) as exc:
+        except (json.JSONDecodeError, KeyError, EnvelopeError, TypeError, AttributeError) as exc:
             raise SourceError(
                 f"{source}:{offset}: unparseable/unmappable source line: {exc}"
             ) from exc

@@ -108,6 +108,17 @@ def _parse_records(path: Path, tolerate_torn_tail: bool = False) -> tuple[list[d
     return records, errors
 
 
+def parsed_records(tolerate_torn_tail: bool = False) -> list[dict]:
+    """All records from the store, parsed; optionally dropping one truncated
+    final line. Shares parsing logic with verify_chain via _parse_records.
+    """
+    path = events_path()
+    if not path.exists():
+        return []
+    records, _errors = _parse_records(path, tolerate_torn_tail=tolerate_torn_tail)
+    return records
+
+
 def verify_chain(path: Path | None = None, tolerate_torn_tail: bool = False) -> list[str]:
     errors: list[str] = []
     path = path or events_path()

@@ -64,6 +64,16 @@ def test_help_exits_0(capsys):
     assert main(["--help"]) == 0
 
 
+def test_verify_tolerate_torn_tail_cli_path(capsys):
+    main(["emit", "--actor", "devon", "--action", "factory.bootstrap",
+          "--result", "success", "--ref", "manual"])
+    from factory_events import store
+    with store.events_path().open("a") as fh:
+        fh.write('{"seq": 2, "prev_hash": "abc", "ha')
+    assert main(["verify"]) == 1
+    assert main(["verify", "--tolerate-torn-tail"]) == 0
+
+
 def test_adapt_high_power_via_cli(tmp_path, monkeypatch, capsys):
     src = tmp_path / "hp.jsonl"
     record = {
