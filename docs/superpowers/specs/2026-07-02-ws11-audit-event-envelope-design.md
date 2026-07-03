@@ -1,7 +1,7 @@
 # WS-1.1 — Common Audit-Event Envelope — Design
 
 **Date:** 2026-07-02
-**Status:** Approved by Devon (brainstorm session 2026-07-02)
+**Status:** IMPLEMENTED 2026-07-03 (branch `feat/ws11-factory-events`; live: 609 events, nightly installed). Implementation deviations from this spec, all reviewed: high-power watermark hashes all ingested content (stronger than §4's last-line hash; field `content_sha256`); adapter action names lowercased (schema pattern governs; original casing in evidence); healthcheck ping URL provisioned into `~/.factory/env` instead of runtime BWS-API resolution; events endpoint joins `item_instance` (no `provider` column exists); `.bak` backfill declined per §4 note; quality-gate bypass records (second writer of the high-power log, discovered at backfill) map to `governance.*` actions; `verify --tolerate-torn-tail` added for restored copies.
 **Workstream:** Phase 1 / WS-1.1 of the software-factory master plan
 (`~/docs/software-delivery-system/2026-07-02-software-factory-master-plan.md`, decision D6)
 **Companion architecture:** `~/docs/software-delivery-system/2026-06-30-foundation-intent-orchestration-architecture.md` §3.5
