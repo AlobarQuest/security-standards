@@ -4,8 +4,27 @@ version = "0.1.0"
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "jsonschema>=4.21", "pyyaml>=6.0"]
+dev = [
+  "pytest>=7.0",
+  "jsonschema>=4.21",
+  "pyyaml>=6.0",
+  "psycopg[binary]>=3.1",
+  "ruff==0.15.20",
+  "pyright==1.1.411",
+]
 events = ["jsonschema>=4.21", "psycopg[binary]>=3.1", "pyyaml>=6.0"]
+
+[dependency-groups]
+# `uv sync` installs the default dev group in the generic Quality workflow.
+# Keep the optional `dev` extra above for security-scan.yml's pip install path.
+dev = [
+  "pytest>=7.0",
+  "jsonschema>=4.21",
+  "pyyaml>=6.0",
+  "psycopg[binary]>=3.1",
+  "ruff==0.15.20",
+  "pyright==1.1.411",
+]
 
 [project.scripts]
 security-scan = "security_scan.cli:main"
@@ -35,4 +54,5 @@ max-complexity = 10
 
 [tool.pyright]
 typeCheckingMode = "basic"
+pythonVersion = "3.12"
 exclude = ["**/node_modules", "**/__pycache__", "**/.*", "**/alembic", "**/migrations"]

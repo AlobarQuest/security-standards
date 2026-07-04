@@ -17,12 +17,16 @@ def _home(tmp_path, monkeypatch):
 
 def _seed(n: int) -> None:
     for i in range(n):
-        store.append_event(envelope.make_event(
-            actor="devon", action="test.ping", result="success",
-            source={"system": "direct", "ref": "test"},
-            timestamp="2026-07-02T00:00:00Z",
-            event_id=envelope.deterministic_event_id("direct", str(i)),
-        ))
+        store.append_event(
+            envelope.make_event(
+                actor="devon",
+                action="test.ping",
+                result="success",
+                source={"system": "direct", "ref": "test"},
+                timestamp="2026-07-02T00:00:00Z",
+                event_id=envelope.deterministic_event_id("direct", str(i)),
+            )
+        )
 
 
 @pytest.fixture()

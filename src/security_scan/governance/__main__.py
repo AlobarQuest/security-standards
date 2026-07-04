@@ -3,23 +3,30 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .loader import load_map
 from .deploy import deploy_artifacts, reconcile_control_plane, verify_artifacts
+from .loader import load_map
 from .ownership import (
-    write_ownership, verify_ownership, verify_headers, strip_stanza, ensure_bws_manifest,
+    ensure_bws_manifest,
+    strip_stanza,
+    verify_headers,
+    verify_ownership,
+    write_ownership,
 )
 
 DEFAULT_MAP = Path(__file__).resolve().parents[3] / "governance-map.toml"
 DEFAULT_OWNERSHIP = "~/.claude/OWNERSHIP.md"
 
 
-def main(argv=None) -> int:
+def main(argv=None) -> int:  # noqa: C901
     ap = argparse.ArgumentParser(prog="security_scan.governance")
     ap.add_argument("command", choices=["deploy", "verify", "ownership", "strip-stanzas"])
     ap.add_argument("--map", default=str(DEFAULT_MAP))
-    ap.add_argument("--artifacts-only", action="store_true",
-                    help="verify: deployed-faithfulness only (artifacts + source headers); "
-                         "skip OWNERSHIP.md freshness")
+    ap.add_argument(
+        "--artifacts-only",
+        action="store_true",
+        help="verify: deployed-faithfulness only (artifacts + source headers); "
+        "skip OWNERSHIP.md freshness",
+    )
     ap.add_argument("--ownership-path", default=DEFAULT_OWNERSHIP)
     args = ap.parse_args(argv)
     manifest = load_map(args.map)

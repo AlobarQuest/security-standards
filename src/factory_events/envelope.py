@@ -51,9 +51,7 @@ def _assert_registered_actor(actor: str) -> None:
     from agent_registry.registry import registered_ids
 
     if actor not in registered_ids():
-        raise EnvelopeError(
-            f"actor {actor!r} is not a registered agent_id (see registry/agents/)"
-        )
+        raise EnvelopeError(f"actor {actor!r} is not a registered agent_id (see registry/agents/)")
 
 
 def make_event(

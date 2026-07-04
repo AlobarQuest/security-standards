@@ -23,7 +23,7 @@ def test_grep_history_finds_removed_secret(git_repo):
     git_repo.write("a.txt", "clean\n")
     git_repo.commit("remove secret")
     assert repo.grep_tracked(git_repo.path, r"0\.[0-9a-f-]{36}\.") == []
-    assert repo.grep_history(git_repo.path, r"0\.[0-9a-f-]{36}\.")              # still in history (non-empty)
+    assert repo.grep_history(git_repo.path, r"0\.[0-9a-f-]{36}\.")  # still in history (non-empty)
 
 
 def test_is_ignored(git_repo):

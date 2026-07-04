@@ -1,7 +1,7 @@
 import json
 import os
-import security_scan
 
+import security_scan
 from security_scan.read_guard import selfcheck
 
 
@@ -94,9 +94,11 @@ def _make_shim(tmp_path, body):
 
 
 def test_canary_ok_with_working_shim(tmp_path):
-    shim = _make_shim(tmp_path,
+    shim = _make_shim(
+        tmp_path,
         f'#!/usr/bin/env bash\nexec /usr/bin/env PYTHONPATH="{_src_dir()}" '
-        f'python3 -m security_scan.read_guard.hook\n')
+        f"python3 -m security_scan.read_guard.hook\n",
+    )
     r = selfcheck.check_canary(shim)
     assert r.ok is True, r.detail
 
@@ -117,9 +119,11 @@ def test_canary_does_not_pollute_real_audit_log(tmp_path, monkeypatch):
     # point the REAL default at a path that must stay empty; canary must use its own temp override
     sentinel = tmp_path / "real-audit.jsonl"
     monkeypatch.setenv("READ_GUARD_AUDIT_LOG", str(sentinel))
-    shim = _make_shim(tmp_path,
+    shim = _make_shim(
+        tmp_path,
         f'#!/usr/bin/env bash\nexec /usr/bin/env PYTHONPATH="{_src_dir()}" '
-        f'python3 -m security_scan.read_guard.hook\n')
+        f"python3 -m security_scan.read_guard.hook\n",
+    )
     selfcheck.check_canary(shim)
     # the canary sets its OWN READ_GUARD_AUDIT_LOG for the subprocess, so the sentinel stays absent
     assert not sentinel.exists()
@@ -128,7 +132,9 @@ def test_canary_does_not_pollute_real_audit_log(tmp_path, monkeypatch):
 def test_main_presence_exit_codes(monkeypatch, capsys):
     monkeypatch.setattr(selfcheck, "check_presence", lambda *a, **k: selfcheck.Result(True, "ok"))
     assert selfcheck.main([]) == 0
-    monkeypatch.setattr(selfcheck, "check_presence", lambda *a, **k: selfcheck.Result(False, "nope"))
+    monkeypatch.setattr(
+        selfcheck, "check_presence", lambda *a, **k: selfcheck.Result(False, "nope")
+    )
     assert selfcheck.main([]) == 1
 
 
@@ -136,5 +142,7 @@ def test_main_canary_exit_codes(monkeypatch):
     monkeypatch.setattr(selfcheck, "check_presence", lambda *a, **k: selfcheck.Result(True, "ok"))
     monkeypatch.setattr(selfcheck, "check_canary", lambda *a, **k: selfcheck.Result(True, "ok"))
     assert selfcheck.main(["--canary"]) == 0
-    monkeypatch.setattr(selfcheck, "check_canary", lambda *a, **k: selfcheck.Result(False, "broken"))
+    monkeypatch.setattr(
+        selfcheck, "check_canary", lambda *a, **k: selfcheck.Result(False, "broken")
+    )
     assert selfcheck.main(["--canary"]) == 1  # canary fail -> overall fail

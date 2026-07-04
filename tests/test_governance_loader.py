@@ -1,6 +1,6 @@
 from security_scan.governance.loader import load_map
 
-SAMPLE = '''
+SAMPLE = """
 [[tool]]
 name = "security-scan.sh"
 lane = "detect"
@@ -27,7 +27,8 @@ uses_bws = true
 [[runtime_dir]]
 path = "~/.claude/audit"
 note = "weekly detector logs"
-'''
+"""
+
 
 def test_load_map_parses_all_sections(tmp_path):
     p = tmp_path / "governance-map.toml"
@@ -38,11 +39,14 @@ def test_load_map_parses_all_sections(tmp_path):
     assert m.tools[0].artifact_class == "deployed"
     assert m.tools[0].mode == "755"
     assert {r.name: r.cls for r in m.repos} == {
-        "security-standards": "tool-home", "FacelessTT": "consumer"}
+        "security-standards": "tool-home",
+        "FacelessTT": "consumer",
+    }
     fac = next(r for r in m.repos if r.name == "FacelessTT")
     assert fac.uses_bws is True
     assert m.repos[0].consumers == ["infraops-mcp-server"]
     assert m.runtime_dirs[0].path == "~/.claude/audit"
+
 
 def test_repo_defaults(tmp_path):
     p = tmp_path / "g.toml"

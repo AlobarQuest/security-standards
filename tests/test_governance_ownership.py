@@ -1,9 +1,15 @@
 from security_scan.governance.__main__ import main as gov_main
 from security_scan.governance.loader import Manifest, Repo, Tool
 from security_scan.governance.ownership import (
-    START, END, strip_stanza, ensure_bws_manifest,
-    render_ownership, write_ownership, verify_ownership,
-    source_header_lines, verify_headers,
+    END,
+    START,
+    ensure_bws_manifest,
+    render_ownership,
+    source_header_lines,
+    strip_stanza,
+    verify_headers,
+    verify_ownership,
+    write_ownership,
 )
 
 
@@ -25,11 +31,22 @@ def test_ensure_bws_manifest(tmp_path):
 
 
 def _own_manifest():
-    tool = Tool(name="security-scan.sh", lane="detect", home_repo="security-standards",
-                source="scripts/security-scan.sh", artifact_class="deployed",
-                deploy_target="~/.claude/bin/security-scan.sh", mode="755")
-    th = Repo(name="security-standards", path="~/Projects/security-standards",
-              cls="tool-home", lane="detect", owns=["security-scan.sh"])
+    tool = Tool(
+        name="security-scan.sh",
+        lane="detect",
+        home_repo="security-standards",
+        source="scripts/security-scan.sh",
+        artifact_class="deployed",
+        deploy_target="~/.claude/bin/security-scan.sh",
+        mode="755",
+    )
+    th = Repo(
+        name="security-standards",
+        path="~/Projects/security-standards",
+        cls="tool-home",
+        lane="detect",
+        owns=["security-scan.sh"],
+    )
     cons = Repo(name="FacelessTT", path="~/Projects/FacelessTT", cls="consumer", uses_bws=True)
     return Manifest(tools=[tool], repos=[th, cons], runtime_dirs=[])
 
@@ -48,15 +65,24 @@ def test_render_ownership_has_artifact_lane_and_gating():
 
 def _host_manifest():
     m = _own_manifest()
-    m.repos.append(Repo(
-        name="claude-control-plane", path="~/.claude", cls="host",
-        remote="https://github.com/AlobarQuest/claude-control-plane.git",
-        owns=["~/.claude/CLAUDE.md (global session instructions)"],
-    ))
-    m.tools.append(Tool(
-        name="CLAUDE.md", lane="host", home_repo="claude-control-plane",
-        source="CLAUDE.md", artifact_class="hosted",
-    ))
+    m.repos.append(
+        Repo(
+            name="claude-control-plane",
+            path="~/.claude",
+            cls="host",
+            remote="https://github.com/AlobarQuest/claude-control-plane.git",
+            owns=["~/.claude/CLAUDE.md (global session instructions)"],
+        )
+    )
+    m.tools.append(
+        Tool(
+            name="CLAUDE.md",
+            lane="host",
+            home_repo="claude-control-plane",
+            source="CLAUDE.md",
+            artifact_class="hosted",
+        )
+    )
     return m
 
 
@@ -98,9 +124,15 @@ def test_verify_ownership_missing_then_ok_then_drift(tmp_path):
 def _hdr_manifest(tmp_path, body_first_tool="echo a\n", with_header=True):
     home = tmp_path / "home"
     (home / "scripts").mkdir(parents=True)
-    tool = Tool(name="a.sh", lane="detect", home_repo="home",
-                source="scripts/a.sh", artifact_class="deployed",
-                deploy_target="~/.claude/bin/a.sh", mode="755")
+    tool = Tool(
+        name="a.sh",
+        lane="detect",
+        home_repo="home",
+        source="scripts/a.sh",
+        artifact_class="deployed",
+        deploy_target="~/.claude/bin/a.sh",
+        mode="755",
+    )
     repo = Repo(name="home", path=str(home), cls="tool-home")
     m = Manifest(tools=[tool], repos=[repo], runtime_dirs=[])
     hdr = "\n".join(source_header_lines(tool, m)) + "\n" if with_header else ""
@@ -128,16 +160,22 @@ def test_verify_headers_flags_missing(tmp_path):
 
 def test_verify_headers_flags_wrong_when_stale_header(tmp_path):
     m = _hdr_manifest(tmp_path, with_header=False)
-    p = (tmp_path / "home" / "scripts" / "a.sh")
+    p = tmp_path / "home" / "scripts" / "a.sh"
     p.write_text("#!/bin/bash\n# Source of truth: WRONG/path (deployed → nope)\necho a\n")
     assert verify_headers(m) == [("a.sh", "wrong")]
 
 
 def test_verify_headers_flags_missing_when_source_file_absent(tmp_path):
     # manifest points at a deployed tool whose source file does not exist
-    tool = Tool(name="gone.sh", lane="detect", home_repo="home",
-                source="scripts/gone.sh", artifact_class="deployed",
-                deploy_target="~/.claude/bin/gone.sh", mode="755")
+    tool = Tool(
+        name="gone.sh",
+        lane="detect",
+        home_repo="home",
+        source="scripts/gone.sh",
+        artifact_class="deployed",
+        deploy_target="~/.claude/bin/gone.sh",
+        mode="755",
+    )
     repo = Repo(name="home", path=str(tmp_path / "home"), cls="tool-home")
     (tmp_path / "home" / "scripts").mkdir(parents=True)
     m = Manifest(tools=[tool], repos=[repo], runtime_dirs=[])
@@ -175,6 +213,7 @@ def test_strip_missing_claude_md(tmp_path):
 
 # ─────────────────────── CLI tests ───────────────────────
 
+
 def _cli_map(tmp_path, with_header=True):
     home = tmp_path / "home"
     (home / "scripts").mkdir(parents=True)
@@ -196,9 +235,14 @@ name = "home"
 path = "{home}"
 class = "tool-home"
 ''')
-    hdr = (f"# Source of truth: {home}/scripts/t.sh (deployed → {target})\n"
-           "# Edit here, not in place; then: cd ~/Projects/security-standards && make install\n"
-           ) if with_header else ""
+    hdr = (
+        (
+            f"# Source of truth: {home}/scripts/t.sh (deployed → {target})\n"
+            "# Edit here, not in place; then: cd ~/Projects/security-standards && make install\n"
+        )
+        if with_header
+        else ""
+    )
     tool_src.write_text("#!/bin/bash\n" + hdr + "echo x\n")
     return toml, target
 

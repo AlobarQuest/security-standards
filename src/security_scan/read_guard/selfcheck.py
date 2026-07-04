@@ -3,6 +3,7 @@
 The guard's wiring is machine-local config and fails open, so a broken or
 missing guard removes protection with no signal. These checks make that loud.
 """
+
 import json
 import os
 import subprocess
@@ -21,11 +22,12 @@ class Result:
     detail: str
 
 
-def check_presence(settings_path: str = _DEFAULT_SETTINGS,
-                   shim_path: str = _DEFAULT_SHIM) -> Result:
+def check_presence(
+    settings_path: str = _DEFAULT_SETTINGS, shim_path: str = _DEFAULT_SHIM
+) -> Result:
     """Config-level: is the read-guard wired into settings.json and the shim present+executable?"""
     try:
-        with open(settings_path, "r", encoding="utf-8") as f:
+        with open(settings_path, encoding="utf-8") as f:
             settings = json.load(f)
     except (OSError, ValueError) as e:
         return Result(False, f"cannot read settings.json: {e}")
@@ -69,16 +71,26 @@ def check_canary(shim_path: str = _DEFAULT_SHIM) -> Result:
         with open(clean, "w") as f:
             f.write("nothing here\n")
         env = {**os.environ, "READ_GUARD_AUDIT_LOG": os.path.join(tmpdir, "audit.jsonl")}
-        deny = subprocess.run([shim_path], input=_envelope(secret), capture_output=True,
-                              text=True, env=env, timeout=10)
+        deny = subprocess.run(
+            [shim_path],
+            input=_envelope(secret),
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=10,
+        )
         try:
             decision = json.loads(deny.stdout)["hookSpecificOutput"]["permissionDecision"]
         except Exception:
-            return Result(False, f"shim emitted no deny decision for a token file (stdout={deny.stdout[:200]!r})")
+            return Result(
+                False,
+                f"shim emitted no deny decision for a token file (stdout={deny.stdout[:200]!r})",
+            )
         if decision != "deny":
             return Result(False, f"shim returned '{decision}', expected 'deny' for a token file")
-        allow = subprocess.run([shim_path], input=_envelope(clean), capture_output=True,
-                               text=True, env=env, timeout=10)
+        allow = subprocess.run(
+            [shim_path], input=_envelope(clean), capture_output=True, text=True, env=env, timeout=10
+        )
         if allow.stdout.strip():
             return Result(False, f"shim did not allow a clean file (stdout={allow.stdout[:200]!r})")
         return Result(True, "canary ok (token file denied, clean file allowed)")

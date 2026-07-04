@@ -2,6 +2,7 @@ import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+
 from security_scan import repo
 
 _UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
@@ -10,6 +11,7 @@ _UUID_RX = re.compile(_UUID)
 _BWS_LINE_RX = re.compile(r"(?i)(bws\s+secret|fetch_bws_secret|BWS_\w*SECRET_ID|BWS_ACCESS)")
 
 MANIFEST = ".bws-secrets.toml"
+EXTERNAL_CONSUMPTION_MODES = frozenset({"coolify-env", "environment-injection"})
 
 
 def _is_doc(rel: str) -> bool:
@@ -44,20 +46,28 @@ def declared_uuids(repo_path) -> set[str]:
     return {s["uuid"] for s in data.get("secret", []) if "uuid" in s}
 
 
+def consumption_mode(repo_path) -> str:
+    p = Path(repo_path) / MANIFEST
+    if not p.exists():
+        return "code-reference"
+    data = tomllib.loads(p.read_text())
+    mode = data.get("consumption", "code-reference")
+    return mode if isinstance(mode, str) else "code-reference"
+
+
 @dataclass
 class ManifestDiff:
     manifest_exists: bool
-    undeclared: set[str]   # referenced in code, not in manifest
-    stale: set[str]        # in manifest, not referenced
+    undeclared: set[str]  # referenced in code, not in manifest
+    stale: set[str]  # in manifest, not referenced
 
 
 def diff(repo_path) -> ManifestDiff:
     refd = referenced_uuids(repo_path)
     decl = declared_uuids(repo_path)
     exists = (Path(repo_path) / MANIFEST).exists()
-    return ManifestDiff(manifest_exists=exists,
-                        undeclared=refd - decl,
-                        stale=decl - refd)
+    stale = set() if consumption_mode(repo_path) in EXTERNAL_CONSUMPTION_MODES else decl - refd
+    return ManifestDiff(manifest_exists=exists, undeclared=refd - decl, stale=stale)
 
 
 def _toml_str(s: str) -> str:

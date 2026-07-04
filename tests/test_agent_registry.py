@@ -11,17 +11,34 @@ from agent_registry.registry import (
     validate_registry,
 )
 
-VOCAB = {"schema": "capability-vocabulary/v1",
-         "terms": {"repository_read": "read repo files", "repository_write": "write repo files",
-                   "merge_to_main": "merge PRs to a default branch"}}
-PROFILE = {"schema": "authority-profile/v1", "profile": "test-base-v1",
-           "description": "test baseline", "capabilities": ["repository_read"],
-           "prohibited": ["merge_to_main"]}
-AGENT = {"schema": "agent-identity/v1", "agent_id": "test-agent", "version": 1,
-         "status": "active", "runtime": "claude-code", "operator": "devon",
-         "environment": "mini", "description": "a test agent",
-         "authority_profile": "test-base-v1", "capabilities": ["repository_write"],
-         "prohibited": []}
+VOCAB = {
+    "schema": "capability-vocabulary/v1",
+    "terms": {
+        "repository_read": "read repo files",
+        "repository_write": "write repo files",
+        "merge_to_main": "merge PRs to a default branch",
+    },
+}
+PROFILE = {
+    "schema": "authority-profile/v1",
+    "profile": "test-base-v1",
+    "description": "test baseline",
+    "capabilities": ["repository_read"],
+    "prohibited": ["merge_to_main"],
+}
+AGENT = {
+    "schema": "agent-identity/v1",
+    "agent_id": "test-agent",
+    "version": 1,
+    "status": "active",
+    "runtime": "claude-code",
+    "operator": "devon",
+    "environment": "mini",
+    "description": "a test agent",
+    "authority_profile": "test-base-v1",
+    "capabilities": ["repository_write"],
+    "prohibited": [],
+}
 
 
 def write_registry(root, vocab=VOCAB, profiles=(PROFILE,), agents=(AGENT,)):
@@ -93,6 +110,14 @@ def test_effective_authority_unknown_agent_raises(tmp_path):
 def test_real_registry_validates_and_covers_ws11_vocabulary():
     assert validate_registry() == []
     from agent_registry.registry import registered_ids
+
     # one-for-one supersession of the WS-1.1 provisional vocabulary
-    assert {"devon", "claude-code-unattributed", "change-window-agent", "security-executor",
-            "drift-reconciler", "open-engine-runner", "unknown"} <= registered_ids()
+    assert {
+        "devon",
+        "claude-code-unattributed",
+        "change-window-agent",
+        "security-executor",
+        "drift-reconciler",
+        "open-engine-runner",
+        "unknown",
+    } <= registered_ids()

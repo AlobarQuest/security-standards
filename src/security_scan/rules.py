@@ -2,6 +2,7 @@ import json
 import os
 import urllib.request
 from pathlib import Path
+
 from security_scan.findings import Severity
 
 
@@ -35,8 +36,11 @@ def _fetch_live(category: str) -> list[dict] | None:
     if not base or not key:
         return None
     try:
-        data = _http_get_json(f"{base.rstrip('/')}/api/rules?category={category}",
-                              headers={"x-brain-key": key}, timeout=10)
+        data = _http_get_json(
+            f"{base.rstrip('/')}/api/rules?category={category}",
+            headers={"x-brain-key": key},
+            timeout=10,
+        )
     except Exception:
         return None
     return [r for r in data.get("rules", []) if r.get("check")]
@@ -46,7 +50,7 @@ def load_rules(category: str, cache_path: Path) -> tuple[list[dict], str]:
     """Returns (rules, source) where source is 'live' or 'cache'.
     Rules are filtered to those carrying a `check`, with severity coerced to Severity."""
     live = _fetch_live(category)
-    if live:   # non-empty only; empty/None → fall through to cache (fail safe, never silent-pass)
+    if live:  # non-empty only; empty/None → fall through to cache (fail safe, never silent-pass)
         return [_coerce(r) for r in live], "live"
     cached = json.loads(Path(cache_path).read_text())
     return [_coerce(r) for r in cached], "cache"

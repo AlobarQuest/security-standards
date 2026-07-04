@@ -12,8 +12,7 @@ class Hit:
 
 
 def _git(repo_path, *args) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", *args], cwd=repo_path,
-                          capture_output=True, text=True, timeout=30)
+    return subprocess.run(["git", *args], cwd=repo_path, capture_output=True, text=True, timeout=30)
 
 
 def is_git_repo(repo_path) -> bool:
@@ -21,6 +20,14 @@ def is_git_repo(repo_path) -> bool:
     The scan relies entirely on git; if this is False the scan must fail closed."""
     res = _git(repo_path, "rev-parse", "--is-inside-work-tree")
     return res.returncode == 0 and res.stdout.strip() == "true"
+
+
+def root(repo_path) -> Path | None:
+    """Return the containing worktree root, including from a subdirectory."""
+    res = _git(repo_path, "rev-parse", "--show-toplevel")
+    if res.returncode != 0:
+        return None
+    return Path(res.stdout.strip()).resolve()
 
 
 def tracked_files(repo_path) -> list[str]:

@@ -36,7 +36,9 @@ def deploy_artifacts(manifest: Manifest) -> list[tuple[str, str]]:
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", "-C", str(root), *args],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
 
 
@@ -87,7 +89,8 @@ def reconcile_control_plane(manifest: Manifest) -> list[tuple[str, str]]:
     actions: list[tuple[str, str]] = []
     for root, targets in by_root.items():
         rels = [
-            str(dst.relative_to(root)) for dst in targets
+            str(dst.relative_to(root))
+            for dst in targets
             if _git(root, "check-ignore", "-q", str(dst.relative_to(root))).returncode != 0
         ]
         if not rels:
@@ -97,8 +100,7 @@ def reconcile_control_plane(manifest: Manifest) -> list[tuple[str, str]]:
         # commit scope are precise (a deploy that re-copies identical files is a
         # no-op, not a churn commit).
         changed = sorted(
-            r for r in rels
-            if _git(root, "diff", "--cached", "--quiet", "--", r).returncode != 0
+            r for r in rels if _git(root, "diff", "--cached", "--quiet", "--", r).returncode != 0
         )
         if not changed:
             actions.append((str(root), "control-plane already in sync"))

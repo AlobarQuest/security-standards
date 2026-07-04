@@ -146,6 +146,7 @@ def source_header_lines(tool: Tool, manifest: Manifest) -> list[str]:
 
 def verify_headers(manifest: Manifest) -> list[tuple[str, str]]:
     from .deploy import _source_path
+
     problems: list[tuple[str, str]] = []
     for t in manifest.tools:
         if t.artifact_class != "deployed":

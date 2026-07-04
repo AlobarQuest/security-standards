@@ -27,9 +27,15 @@ def load(repo_path) -> list[AllowEntry]:
     if not p.exists():
         return []
     data = tomllib.loads(p.read_text())
-    return [AllowEntry(rule=e["rule"], file=e.get("file"),
-                       evidence=e.get("evidence"), reason=e.get("reason", ""))
-            for e in data.get("allow", [])]
+    return [
+        AllowEntry(
+            rule=e["rule"],
+            file=e.get("file"),
+            evidence=e.get("evidence"),
+            reason=e.get("reason", ""),
+        )
+        for e in data.get("allow", [])
+    ]
 
 
 def is_allowed(finding, entries) -> bool:
