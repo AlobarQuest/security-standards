@@ -17,3 +17,8 @@ terms:
   email_send: send outbound email
   outward_publish: publish outward-facing content (listings, posts, public docs)
   task_claim: claim work items from a queue (Linear Agent Queue, orchestrator)
+  spend_money: commit to a real-world expense (fees, ad spend, purchases)
+  calendar_write: create, modify, or cancel calendar events
+  third_party_contact: initiate contact with a person or org outside the portfolio (agents, vendors, clients)
+  data_delete: permanently delete data (distinct from soft-delete/deprecate)
+  external_system_write: write to a third-party system of record (MLS, Zillow, CRM, etc.)
