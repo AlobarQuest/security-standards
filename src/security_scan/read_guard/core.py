@@ -1,4 +1,5 @@
 """Read-guard logic: BWS token detection and file-content peek. Fail-open."""
+
 # Deferred annotations: this module is executed by the ambient `python3` of the
 # Claude Code hook environment (system Python 3.9 under launchd), below the 3.12
 # dev floor. `from __future__ import annotations` keeps PEP 604 `X | None`
@@ -19,7 +20,7 @@ def scan_for_bws(output: str) -> list[str]:
 
 @dataclass
 class PeekResult:
-    action: str            # "deny" | "allow"
+    action: str  # "deny" | "allow"
     matched_path: str | None = None
     match_count: int = 0
 
@@ -32,7 +33,7 @@ def peek_decision(file_path: str | None, *, size_cap: int = 262144) -> PeekResul
     try:
         if not os.path.isfile(file_path):
             return PeekResult("allow", file_path)
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read(size_cap + 1)
         if len(content) > size_cap:
             return PeekResult("allow", file_path)

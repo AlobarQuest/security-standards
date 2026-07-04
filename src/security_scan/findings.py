@@ -1,8 +1,8 @@
-from dataclasses import dataclass, asdict
-from enum import Enum
+from dataclasses import asdict, dataclass
+from enum import StrEnum
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     BLOCK = "BLOCK"
     WARN = "WARN"
     INFO = "INFO"
@@ -14,10 +14,10 @@ class Finding:
     severity: Severity
     file: str | None
     line: int | None
-    evidence: str          # MUST already be redacted
+    evidence: str  # MUST already be redacted
     remediation: str
     reason: str
-    kind: str              # "deterministic" | "judgment"
+    kind: str  # "deterministic" | "judgment"
 
     def to_dict(self) -> dict:
         d = asdict(self)

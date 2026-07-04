@@ -1,12 +1,12 @@
-import os
 import subprocess
-from security_scan.governance.loader import Manifest, Tool, Repo
+
+from security_scan.governance.__main__ import main
 from security_scan.governance.deploy import (
     deploy_artifacts,
-    verify_artifacts,
     reconcile_control_plane,
+    verify_artifacts,
 )
-from security_scan.governance.__main__ import main
+from security_scan.governance.loader import Manifest, Repo, Tool
 
 
 def _manifest(tmp_path):
@@ -14,9 +14,15 @@ def _manifest(tmp_path):
     (repo_root / "scripts").mkdir(parents=True)
     (repo_root / "scripts" / "tool.sh").write_text("echo hi\n")
     target = tmp_path / "deployed" / "tool.sh"
-    tool = Tool(name="tool.sh", lane="detect", home_repo="home",
-                source="scripts/tool.sh", artifact_class="deployed",
-                deploy_target=str(target), mode="755")
+    tool = Tool(
+        name="tool.sh",
+        lane="detect",
+        home_repo="home",
+        source="scripts/tool.sh",
+        artifact_class="deployed",
+        deploy_target=str(target),
+        mode="755",
+    )
     repo = Repo(name="home", path=str(repo_root), cls="tool-home")
     return Manifest(tools=[tool], repos=[repo], runtime_dirs=[]), target
 
@@ -76,9 +82,11 @@ class = "tool-home"
 
 # ─────────────────────── control-plane reconcile (prong 1) ───────────────────────
 
+
 def _git(root, *args):
-    return subprocess.run(["git", "-C", str(root), *args],
-                          capture_output=True, text=True, check=True)
+    return subprocess.run(
+        ["git", "-C", str(root), *args], capture_output=True, text=True, check=True
+    )
 
 
 def _control_plane_manifest(tmp_path):
@@ -106,12 +114,24 @@ def _control_plane_manifest(tmp_path):
     _git(home, "add", "-A")
     _git(home, "commit", "-qm", "init")
 
-    hook = Tool(name="guard.sh", lane="detect", home_repo="home",
-                source="hooks/guard.sh", artifact_class="deployed",
-                deploy_target=str(cp / "hooks" / "guard.sh"), mode="755")
-    binscan = Tool(name="scan.sh", lane="detect", home_repo="home",
-                   source="scripts/scan.sh", artifact_class="deployed",
-                   deploy_target=str(cp / "bin" / "scan.sh"), mode="755")
+    hook = Tool(
+        name="guard.sh",
+        lane="detect",
+        home_repo="home",
+        source="hooks/guard.sh",
+        artifact_class="deployed",
+        deploy_target=str(cp / "hooks" / "guard.sh"),
+        mode="755",
+    )
+    binscan = Tool(
+        name="scan.sh",
+        lane="detect",
+        home_repo="home",
+        source="scripts/scan.sh",
+        artifact_class="deployed",
+        deploy_target=str(cp / "bin" / "scan.sh"),
+        mode="755",
+    )
     repo = Repo(name="home", path=str(home), cls="tool-home")
     m = Manifest(tools=[hook, binscan], repos=[repo], runtime_dirs=[])
     return m, cp
@@ -166,9 +186,17 @@ def test_reconcile_reports_only_changed_paths(tmp_path):
     (home / "hooks" / "guard2.sh").write_text("echo guard2\n")
     _git(home, "add", "-A")
     _git(home, "commit", "-qm", "add guard2")
-    m.tools.append(Tool(name="guard2.sh", lane="detect", home_repo="home",
-                        source="hooks/guard2.sh", artifact_class="deployed",
-                        deploy_target=str(cp / "hooks" / "guard2.sh"), mode="755"))
+    m.tools.append(
+        Tool(
+            name="guard2.sh",
+            lane="detect",
+            home_repo="home",
+            source="hooks/guard2.sh",
+            artifact_class="deployed",
+            deploy_target=str(cp / "hooks" / "guard2.sh"),
+            mode="755",
+        )
+    )
     deploy_artifacts(m)
     reconcile_control_plane(m)  # commits both hooks
     # now change only guard2's source and redeploy

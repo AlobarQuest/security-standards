@@ -1,6 +1,7 @@
 import json
 import time as _time
 import uuid
+
 from security_scan import token_shapes
 from security_scan.read_guard import core
 
@@ -68,7 +69,7 @@ def test_peek_allows_clean_file(tmp_path):
 
 
 def test_peek_allows_missing_path_and_none():
-    assert core.peek_decision(str("/no/such/file/xyz.env")).action == "allow"
+    assert core.peek_decision("/no/such/file/xyz.env").action == "allow"
     assert core.peek_decision(None).action == "allow"
 
 
@@ -97,12 +98,12 @@ def test_peek_allows_unreadable_file(tmp_path):
 
 def test_hook_denies_read_of_token_file(tmp_path, monkeypatch):
     from security_scan.read_guard import hook
+
     monkeypatch.setenv("READ_GUARD_AUDIT_LOG", str(tmp_path / "a.jsonl"))
     t = _synth_token()
     f = tmp_path / "secret.env"
     f.write_text(f"BWS_ACCESS_TOKEN={t}\n")
-    env = json.dumps({"session_id": "s", "tool_name": "Read",
-                      "tool_input": {"file_path": str(f)}})
+    env = json.dumps({"session_id": "s", "tool_name": "Read", "tool_input": {"file_path": str(f)}})
     out = hook.run(env, now="2026-06-17T00:00:00Z")
     obj = json.loads(out)["hookSpecificOutput"]
     assert obj["hookEventName"] == "PreToolUse"
@@ -113,28 +114,29 @@ def test_hook_denies_read_of_token_file(tmp_path, monkeypatch):
 
 def test_hook_allows_clean_file(tmp_path, monkeypatch):
     from security_scan.read_guard import hook
+
     monkeypatch.setenv("READ_GUARD_AUDIT_LOG", str(tmp_path / "a.jsonl"))
     f = tmp_path / "clean.txt"
     f.write_text("nothing here\n")
-    env = json.dumps({"session_id": "s", "tool_name": "Read",
-                      "tool_input": {"file_path": str(f)}})
+    env = json.dumps({"session_id": "s", "tool_name": "Read", "tool_input": {"file_path": str(f)}})
     assert hook.run(env, now="2026-06-17T00:00:00Z") == ""
 
 
 def test_hook_malformed_envelope_fail_open(monkeypatch, tmp_path):
     from security_scan.read_guard import hook
+
     monkeypatch.setenv("READ_GUARD_AUDIT_LOG", str(tmp_path / "a.jsonl"))
     assert hook.run("not json{", now="2026-06-17T00:00:00Z") == ""
 
 
 def test_hook_audit_written_on_deny_no_value(tmp_path, monkeypatch):
     from security_scan.read_guard import hook
+
     monkeypatch.setenv("READ_GUARD_AUDIT_LOG", str(tmp_path / "a.jsonl"))
     t = _synth_token()
     f = tmp_path / "secret.env"
     f.write_text(f"{t}\n")
-    env = json.dumps({"session_id": "s", "tool_name": "Read",
-                      "tool_input": {"file_path": str(f)}})
+    env = json.dumps({"session_id": "s", "tool_name": "Read", "tool_input": {"file_path": str(f)}})
     hook.run(env, now="2026-06-17T00:00:00Z")
     line = (tmp_path / "a.jsonl").read_text().strip()
     rec = json.loads(line)
@@ -143,6 +145,7 @@ def test_hook_audit_written_on_deny_no_value(tmp_path, monkeypatch):
 
 def test_hook_non_dict_tool_input_fail_open():
     from security_scan.read_guard import hook
+
     for bad in ("weird-string", [1, 2], 42):
         env = json.dumps({"session_id": "s", "tool_name": "Read", "tool_input": bad})
         assert hook.run(env, now="2026-06-17T00:00:00Z") == ""
@@ -150,5 +153,9 @@ def test_hook_non_dict_tool_input_fail_open():
 
 def test_hook_missing_tool_input_fail_open():
     from security_scan.read_guard import hook
+
     assert hook.run(json.dumps({"tool_name": "Read"}), now="2026-06-17T00:00:00Z") == ""
-    assert hook.run(json.dumps({"tool_name": "Read", "tool_input": {}}), now="2026-06-17T00:00:00Z") == ""
+    assert (
+        hook.run(json.dumps({"tool_name": "Read", "tool_input": {}}), now="2026-06-17T00:00:00Z")
+        == ""
+    )

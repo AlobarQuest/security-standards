@@ -11,7 +11,13 @@ $(error No Python >=3.11 with tomllib found (tried .venv, python3.12, python3.11
 endif
 PY := PYTHONPATH=src $(PYBIN)
 
-.PHONY: install verify ownership strip-stanzas test
+.PHONY: install verify ownership strip-stanzas test check
+
+check:
+	$(PY) -m ruff check .
+	$(PY) -m ruff format --check .
+	$(PY) -m pyright
+	$(PY) -m pytest -q
 
 install:  ## deploy artifacts, reconcile control-plane, regenerate OWNERSHIP.md, then verify
 	$(PY) -m security_scan.governance deploy

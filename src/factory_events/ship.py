@@ -75,17 +75,28 @@ def ship(dsn: str | None = None, rebuild: bool = False) -> tuple[int, tuple[int,
         with conn.cursor() as cur:
             for rec in store.iter_records():
                 ev = rec["event"]
-                cur.execute(INSERT, (
-                    ev["event_id"], rec["seq"], ev["timestamp"], ev["actor"], ev["action"],
-                    ev["target"], ev["work_package"], ev["input_revision"], ev["result"],
-                    ev["source"]["system"], ev["correlation_id"], Json(ev),
-                    rec["hash"], rec["prev_hash"],
-                ))
+                cur.execute(
+                    INSERT,
+                    (
+                        ev["event_id"],
+                        rec["seq"],
+                        ev["timestamp"],
+                        ev["actor"],
+                        ev["action"],
+                        ev["target"],
+                        ev["work_package"],
+                        ev["input_revision"],
+                        ev["result"],
+                        ev["source"]["system"],
+                        ev["correlation_id"],
+                        Json(ev),
+                        rec["hash"],
+                        rec["prev_hash"],
+                    ),
+                )
                 inserted += cur.rowcount
         current = store.head()
         if current:
-            conn.execute(
-                "INSERT INTO chain_heads (seq, head_hash) VALUES (%s, %s)", current
-            )
+            conn.execute("INSERT INTO chain_heads (seq, head_hash) VALUES (%s, %s)", current)
         conn.commit()
     return inserted, current

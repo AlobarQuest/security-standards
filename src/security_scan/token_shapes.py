@@ -4,6 +4,7 @@ The bare-token shape mirrors the regex in ~/.claude/hooks/bws-write-guard.sh
 (kept identical by hand; that hook is bash and cannot import this). Any change
 here must be reflected there.
 """
+
 import re
 
 # BWS access token: "0." + 36-char uuid-ish + "." + base64-ish secret (>=20).

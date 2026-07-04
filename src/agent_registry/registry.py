@@ -51,8 +51,10 @@ def load_agents(registry_dir: Path | None = None) -> dict[str, dict]:
 
 def _schema_errors(doc: dict, schema_path: Path, where: str) -> list[str]:
     errors = sorted(_validator(schema_path).iter_errors(doc), key=lambda e: list(e.absolute_path))
-    return [f"{where}: {'/'.join(str(p) for p in e.absolute_path) or '<root>'}: {e.message}"
-            for e in errors]
+    return [
+        f"{where}: {'/'.join(str(p) for p in e.absolute_path) or '<root>'}: {e.message}"
+        for e in errors
+    ]
 
 
 def _validate_profile(stem: str, profile: dict, vocabulary: set[str]) -> list[str]:

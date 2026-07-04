@@ -1,4 +1,4 @@
-from security_scan.findings import Severity, Finding, redact
+from security_scan.findings import Finding, Severity, redact
 
 
 def test_redact_masks_secret_tail_but_keeps_short_prefix():
@@ -14,8 +14,16 @@ def test_redact_fully_masks_short_values():
 
 
 def test_finding_to_dict_roundtrips():
-    f = Finding(rule_id="r", severity=Severity.BLOCK, file="a.py", line=3,
-                evidence="0.45eb08…", remediation="fix", reason="why", kind="deterministic")
+    f = Finding(
+        rule_id="r",
+        severity=Severity.BLOCK,
+        file="a.py",
+        line=3,
+        evidence="0.45eb08…",
+        remediation="fix",
+        reason="why",
+        kind="deterministic",
+    )
     d = f.to_dict()
     assert d["severity"] == "BLOCK"
     assert d["file"] == "a.py" and d["line"] == 3

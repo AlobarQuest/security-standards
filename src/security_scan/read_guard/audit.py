@@ -9,9 +9,15 @@ def log_path() -> str:
 
 
 def log_event(now, session_id, tool_name, event, matched_path, match_count) -> None:
-    rec = {"timestamp": now, "tool": "read-guard", "session_id": session_id or "",
-           "event": event, "tool_name": tool_name or "", "matched_path": matched_path,
-           "match_count": match_count}
+    rec = {
+        "timestamp": now,
+        "tool": "read-guard",
+        "session_id": session_id or "",
+        "event": event,
+        "tool_name": tool_name or "",
+        "matched_path": matched_path,
+        "match_count": match_count,
+    }
     path = log_path()
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)

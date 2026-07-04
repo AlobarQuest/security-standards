@@ -6,6 +6,7 @@ counts as consumed (manifest.referenced_uuids, runtime code only), optionally
 enriched with each secret's name and project from BWS. It reads secret
 *metadata* only — never values — and prints to stdout unless --write is given.
 """
+
 import argparse
 import json
 import subprocess
@@ -29,8 +30,9 @@ def build_enrich_map(secrets: list[dict], projects: list[dict]) -> dict[str, dic
 def _bws_json(*args) -> list | None:
     """Run a read-only `bws ... --output json` command; None on any failure."""
     try:
-        res = subprocess.run(["bws", *args, "--output", "json"],
-                             capture_output=True, text=True, timeout=60)
+        res = subprocess.run(
+            ["bws", *args, "--output", "json"], capture_output=True, text=True, timeout=60
+        )
     except (OSError, subprocess.SubprocessError):
         return None
     if res.returncode != 0:
@@ -51,12 +53,18 @@ def load_enrich_map() -> dict[str, dict] | None:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Generate .bws-secrets.toml from runtime BWS references.")
+    ap = argparse.ArgumentParser(
+        description="Generate .bws-secrets.toml from runtime BWS references."
+    )
     ap.add_argument("repo", nargs="?", default=".", help="repo path (default: cwd)")
-    ap.add_argument("--write", action="store_true",
-                    help="write .bws-secrets.toml in the repo (default: print to stdout)")
-    ap.add_argument("--no-enrich", action="store_true",
-                    help="skip the BWS lookup; emit UUID-only entries")
+    ap.add_argument(
+        "--write",
+        action="store_true",
+        help="write .bws-secrets.toml in the repo (default: print to stdout)",
+    )
+    ap.add_argument(
+        "--no-enrich", action="store_true", help="skip the BWS lookup; emit UUID-only entries"
+    )
     args = ap.parse_args(argv)
 
     repo_path = Path(args.repo)

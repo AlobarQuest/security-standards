@@ -1,14 +1,22 @@
 import fnmatch
 import re
 from pathlib import Path
+
 from security_scan import repo
 from security_scan.findings import Finding, redact
 
 
 def _finding(rule, file, line, evidence, kind="deterministic") -> Finding:
-    return Finding(rule_id=rule["id"], severity=rule["severity"], file=file, line=line,
-                   evidence=evidence, remediation=rule["remediation"],
-                   reason=rule["reason"], kind=kind)
+    return Finding(
+        rule_id=rule["id"],
+        severity=rule["severity"],
+        file=file,
+        line=line,
+        evidence=evidence,
+        remediation=rule["remediation"],
+        reason=rule["reason"],
+        kind=kind,
+    )
 
 
 def _forbidden_pattern(rule, repo_path) -> list[Finding]:
@@ -16,12 +24,20 @@ def _forbidden_pattern(rule, repo_path) -> list[Finding]:
     scope = check.get("scope", "tracked")
     pattern = check["pattern"]
     if scope == "history":
-        return [_finding(rule, file=None, line=None,
-                         evidence=f"pattern present in git history (commit {sha[:12]})")
-                for sha in repo.grep_history(repo_path, pattern)]
+        return [
+            _finding(
+                rule,
+                file=None,
+                line=None,
+                evidence=f"pattern present in git history (commit {sha[:12]})",
+            )
+            for sha in repo.grep_history(repo_path, pattern)
+        ]
     # tracked (default)
-    return [_finding(rule, file=h.file, line=h.line, evidence=redact(h.match))
-            for h in repo.grep_tracked(repo_path, pattern)]
+    return [
+        _finding(rule, file=h.file, line=h.line, evidence=redact(h.match))
+        for h in repo.grep_tracked(repo_path, pattern)
+    ]
 
 
 def _gitignore_covers(rule, repo_path) -> list[Finding]:
@@ -34,33 +50,35 @@ def _gitignore_covers(rule, repo_path) -> list[Finding]:
         else:
             probe = glob.replace("*", "x")
         if not repo.is_ignored(repo_path, probe):
-            findings.append(_finding(rule, file=".gitignore", line=None,
-                                     evidence=f"glob not covered: {glob}"))
+            findings.append(
+                _finding(rule, file=".gitignore", line=None, evidence=f"glob not covered: {glob}")
+            )
     return findings
 
 
 def _path_absent(rule, repo_path) -> list[Finding]:
     glob = rule["check"]["glob"]
     matches = [p for p in repo.tracked_files(repo_path) if fnmatch.fnmatch(p, glob)]
-    return [_finding(rule, file=m, line=None, evidence=f"tracked path matches {glob}")
-            for m in matches]
+    return [
+        _finding(rule, file=m, line=None, evidence=f"tracked path matches {glob}") for m in matches
+    ]
 
 
 def _required_pattern(rule, repo_path) -> list[Finding]:
     rx = re.compile(rule["check"]["pattern"])
     globs = rule["check"].get("globs", ["*"])
-    relevant = [p for p in repo.tracked_files(repo_path)
-                if any(fnmatch.fnmatch(p, g) for g in globs)]
+    relevant = [
+        p for p in repo.tracked_files(repo_path) if any(fnmatch.fnmatch(p, g) for g in globs)
+    ]
     if not relevant:
         return []
     for rel in relevant:
         try:
             if rx.search((repo_path / rel).read_text(errors="ignore")):
-                return []   # found somewhere → satisfied
+                return []  # found somewhere → satisfied
         except OSError:
             continue
-    return [_finding(rule, file=None, line=None,
-                     evidence=f"required pattern absent in {globs}")]
+    return [_finding(rule, file=None, line=None, evidence=f"required pattern absent in {globs}")]
 
 
 _DISPATCH = {
@@ -77,5 +95,5 @@ def evaluate(rule, repo_path) -> list[Finding]:
     kind = rule["check"]["kind"]
     handler = _DISPATCH.get(kind)
     if handler is None:
-        return []   # unknown/judgment kinds handled elsewhere
+        return []  # unknown/judgment kinds handled elsewhere
     return handler(rule, repo_path)

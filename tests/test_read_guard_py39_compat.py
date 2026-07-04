@@ -8,6 +8,7 @@ emits nothing, and — being fail-open — silently stops protecting reads (obse
 So the read_guard subpackage carries a stricter contract than the rest of the
 package: it MUST import under Python 3.9. This guards the whole class of bug
 (e.g. a PEP 604 ``X | None`` union evaluated at import time)."""
+
 import os
 import shutil
 import subprocess
@@ -33,7 +34,9 @@ def _find_py39():
         try:
             out = subprocess.run(
                 [path, "-c", "import sys; print('%d.%d' % sys.version_info[:2])"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
         except OSError:
             continue
@@ -49,7 +52,9 @@ def test_read_guard_module_imports_under_python39(module):
         pytest.skip("no Python 3.9 interpreter available to test hook-deploy import safety")
     r = subprocess.run(
         [py39, "-c", f"import {module}"],
-        capture_output=True, text=True, timeout=30,
+        capture_output=True,
+        text=True,
+        timeout=30,
         env={**os.environ, "PYTHONPATH": _SRC},
     )
     assert r.returncode == 0, (

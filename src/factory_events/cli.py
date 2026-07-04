@@ -51,12 +51,17 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         if anchor is not None:
             seqs = {rec["seq"]: rec["hash"] for rec in records}
             if seqs.get(anchor[0]) != anchor[1]:
-                print(f"VERIFY FAIL: anchored head (seq {anchor[0]}) not in chain — "
-                      "store rewritten since last anchor", file=sys.stderr)
+                print(
+                    f"VERIFY FAIL: anchored head (seq {anchor[0]}) not in chain — "
+                    "store rewritten since last anchor",
+                    file=sys.stderr,
+                )
                 return 1
             print(f"anchor ok: seq {anchor[0]} present")
-    print(f"chain ok: {current[0] if current else 0} events"
-          + (f", head {current[1]}" if current else ""))
+    print(
+        f"chain ok: {current[0] if current else 0} events"
+        + (f", head {current[1]}" if current else "")
+    )
     return 0
 
 
@@ -107,14 +112,21 @@ def build_parser() -> argparse.ArgumentParser:
     emit.add_argument("--ref", required=True, help="source.ref, e.g. the emitter name")
     emit.add_argument("--target", default=None)
     emit.add_argument("--correlation-id", dest="correlation_id", default=None)
-    emit.add_argument("--evidence-json", dest="evidence_json", default=None,
-                      help="one JSON object appended to evidence[]")
+    emit.add_argument(
+        "--evidence-json",
+        dest="evidence_json",
+        default=None,
+        help="one JSON object appended to evidence[]",
+    )
     emit.set_defaults(func=_cmd_emit)
 
     verify = sub.add_parser("verify", help="verify the full hash chain + schemas")
     verify.add_argument("--against-anchor", action="store_true")
-    verify.add_argument("--tolerate-torn-tail", action="store_true",
-                        help="accept one truncated final line (restored-copy verification)")
+    verify.add_argument(
+        "--tolerate-torn-tail",
+        action="store_true",
+        help="accept one truncated final line (restored-copy verification)",
+    )
     verify.set_defaults(func=_cmd_verify)
 
     adapt = sub.add_parser("adapt", help="translate source logs into the store")
@@ -123,8 +135,11 @@ def build_parser() -> argparse.ArgumentParser:
     adapt.set_defaults(func=_cmd_adapt)
 
     ship_cmd = sub.add_parser("ship", help="upsert events into the Postgres projection")
-    ship_cmd.add_argument("--rebuild", action="store_true",
-                          help="truncate factory_events (never chain_heads) and replay")
+    ship_cmd.add_argument(
+        "--rebuild",
+        action="store_true",
+        help="truncate factory_events (never chain_heads) and replay",
+    )
     ship_cmd.set_defaults(func=_cmd_ship)
     return parser
 
