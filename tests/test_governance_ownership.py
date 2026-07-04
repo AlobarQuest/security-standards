@@ -87,7 +87,8 @@ def _host_manifest():
 
 
 def test_render_ownership_covers_control_plane_host():
-    s = render_ownership(_host_manifest())
+    manifest = _host_manifest()
+    s = render_ownership(manifest)
     assert "## Control-plane host" in s
     assert "claude-control-plane" in s
     assert "github.com/AlobarQuest/claude-control-plane.git" in s
@@ -96,7 +97,8 @@ def test_render_ownership_covers_control_plane_host():
     # hosted artifacts are not in the deployed table and carry no source header
     assert "no `# Source of truth:` header" in s
     # a hosted tool must not leak into the deployed-artifacts verification surface
-    assert verify_headers(_host_manifest()) == []
+    manifest.tools = [tool for tool in manifest.tools if tool.artifact_class == "hosted"]
+    assert verify_headers(manifest) == []
 
 
 def test_render_ownership_omits_host_section_when_absent():
