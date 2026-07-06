@@ -22,6 +22,14 @@ nightly Postgres projection. Spec:
 - `ship [--rebuild]` — upsert into the projection + anchor the current head.
   `--rebuild` truncates `factory_events` (never `chain_heads`) and replays.
 
+## Integration tests
+
+The default repository gate excludes projection-store integration tests so
+`make check` remains warning-clean and skip-clean without requiring a live DSN.
+Run the explicit integration gate only against a disposable PostgreSQL database:
+
+    FACTORY_TEST_DSN=postgresql://... make check-integration
+
 ## Actor identity — the agent registry (WS-1.2)
 
 Actors are validated against the agent-identity registry at `registry/`
