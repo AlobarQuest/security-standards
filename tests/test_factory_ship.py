@@ -1,4 +1,6 @@
 import os
+from importlib import import_module
+from typing import Any
 
 import pytest
 
@@ -6,7 +8,11 @@ from factory_events import envelope, ship, store
 from factory_events.cli import main
 
 DSN = os.environ.get("FACTORY_TEST_DSN")
-needs_pg = pytest.mark.skipif(not DSN, reason="FACTORY_TEST_DSN not set")
+pytestmark = pytest.mark.integration
+
+
+def _psycopg() -> Any:
+    return import_module("psycopg")
 
 
 @pytest.fixture(autouse=True)
@@ -33,14 +39,13 @@ def _seed(n: int) -> None:
 def pg(monkeypatch):
     monkeypatch.setenv("FACTORY_DB_DSN", DSN)
     assert DSN is not None
-    import psycopg
+    psycopg = _psycopg()
 
     with psycopg.connect(DSN) as conn:
         conn.execute("DROP TABLE IF EXISTS factory_events, chain_heads")
     yield DSN
 
 
-@needs_pg
 def test_ship_inserts_and_anchors(pg):
     _seed(3)
     inserted, head = ship.ship()
@@ -52,7 +57,7 @@ def test_ship_inserts_and_anchors(pg):
     inserted2, _ = ship.ship()
     assert inserted2 == 0
     # anchors accumulate (a second head row, same head)
-    import psycopg
+    psycopg = _psycopg()
 
     with psycopg.connect(pg) as conn:
         chain_heads_count = conn.execute("SELECT count(*) FROM chain_heads").fetchone()
@@ -60,12 +65,11 @@ def test_ship_inserts_and_anchors(pg):
         assert chain_heads_count[0] == 2
 
 
-@needs_pg
 def test_ship_rebuild_replays_but_keeps_anchors(pg):
     _seed(2)
     ship.ship()
     inserted, _ = ship.ship(rebuild=True)
-    import psycopg
+    psycopg = _psycopg()
 
     with psycopg.connect(pg) as conn:
         events_count = conn.execute("SELECT count(*) FROM factory_events").fetchone()
@@ -77,11 +81,10 @@ def test_ship_rebuild_replays_but_keeps_anchors(pg):
     assert inserted == 2
 
 
-@needs_pg
 def test_ship_promotes_query_columns(pg):
     _seed(1)
     ship.ship()
-    import psycopg
+    psycopg = _psycopg()
 
     with psycopg.connect(pg) as conn:
         row = conn.execute(
