@@ -80,3 +80,20 @@ def test_make_event_accepts_registered_actor_any_status():
         source={"system": "direct", "ref": "test"},
     )
     assert event["actor"] == "factory-runner"
+
+
+def test_make_event_accepts_orchestrator_source():
+    event = envelope.make_event(
+        actor="devon",
+        action="orchestrator.evidence_recorded",
+        result="success",
+        source={"system": "orchestrator", "ref": "orchestrator:evidence:abc"},
+        timestamp="2026-07-06T18:00:00Z",
+        evidence=[{"record": {"source_kind": "evidence"}}],
+        event_id="evt-" + "a" * 64,
+    )
+
+    assert event["source"] == {
+        "system": "orchestrator",
+        "ref": "orchestrator:evidence:abc",
+    }

@@ -23,7 +23,7 @@
       "additionalProperties": false,
       "required": ["system", "ref"],
       "properties": {
-        "system": {"enum": ["high-power-audit", "change-manager", "direct"]},
+        "system": {"enum": ["high-power-audit", "change-manager", "orchestrator", "direct"]},
         "ref": {"type": "string"}
       }
     }
