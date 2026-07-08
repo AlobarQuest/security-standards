@@ -71,9 +71,9 @@ def test_make_event_rejects_unregistered_actor():
         )
 
 
-def test_make_event_accepts_registered_actor_any_status():
+def test_make_event_accepts_registered_actor():
     event = envelope.make_event(
-        actor="factory-runner",  # status: reserved — must still validate
+        actor="factory-runner",
         action="tool.test",
         result="unknown",
         timestamp="2026-07-03T00:00:00Z",
