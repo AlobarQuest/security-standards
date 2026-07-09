@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: orchestrator-system
+version: 1
+status: active
+runtime: claude-code
+operator: devon
+environment: any
+description: WS-6.4 durable SYSTEM actor for the orchestrator (sds.alobar.net). Presents the ActorRole.SYSTEM M2M credential to dispatch work units, drive Draft→Ready, reclaim expired leases, and ingest observations. Approval remains HUMAN-only; this identity cannot approve or merge.
+authority_profile: orchestrator-system-v1
+capabilities: []
+prohibited: []

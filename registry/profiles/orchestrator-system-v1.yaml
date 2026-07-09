@@ -1,0 +1,15 @@
+schema: authority-profile/v1
+profile: orchestrator-system-v1
+description: Orchestrator system actor — drives work-unit lifecycle transitions, dispatch, and lease recovery. Never authors code, never approves, never merges.
+capabilities:
+  - task_claim
+  - event_emit
+prohibited:
+  - repository_write
+  - merge_to_main
+  - change_approval
+  - infra_mutation
+  - secret_write
+  - credential_create
+  - credential_revoke
+  - outward_publish
