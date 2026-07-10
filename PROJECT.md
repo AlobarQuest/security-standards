@@ -41,4 +41,9 @@ required_checks:
 
 - [x] (P2) Scanner resolves the containing git worktree root before enumerating files, loading manifests, or applying `.security-scan-allow.toml`; subdirectory scans now use the root policy consistently. — added 2026-07-03; resolved 2026-07-04
 - [ ] (P2) CI guard: STANDARD_VERSION must be bumped when the standard's rules change in a diff (WS-1.3 follow-up) — added 2026-07-03
+- [ ] (P3) factory_events store: cached-head/seek-tail optimization — append_event re-reads the whole file per append and adapters full-scan event_ids() per run; O(n²) backfill, fine at ~600 events, hurts at ~1e5 — added 2026-07-10
+- [ ] (P3) factory_events CLI error formatting: pagination RuntimeError and DB-unreachable psycopg errors bypass the ADAPT FAIL/VERIFY FAIL stderr formatting (fail-loud already, cosmetic); fold in malformed-response JSONDecodeError catch in change-manager _http_fetch and the resume-after-fix test assertion — added 2026-07-10
+- [ ] (P3) Decide single write path for ~/.claude/bin/factory-events-nightly.sh: installer cp duplicates the governance make-install deploy; either drop the cp or register the plist template in governance-map — added 2026-07-10
+- [ ] (P3) Nightly healthcheck curl: add --retry 3 to reduce false dead-man alerts on transient blips (factory-events-nightly.sh) — added 2026-07-10
+- [ ] (P2) Split the shared BWS machine account into per-workload least-privilege accounts. The three pipeline Keychain tokens (BWS_ACCESS_TOKEN_INFRA_DRIFT, BWS_ACCESS_TOKEN_INFRAOPS, BWS_ACCESS_TOKEN_VPS_BACKUP) all hold the SAME broad machine account (fp da55db37ea81, uuid 8ba33ccd) — found 2026-07-02 (WS-0.7). Give each workload its own scoped machine account (50-token headroom), like the dedicated cred-rotation account in infraops PR #33. Ref: infra-brain lesson #451. — added 2026-07-10
 ## Future plans
