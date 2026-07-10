@@ -1,0 +1,15 @@
+schema: authority-profile/v1
+profile: verifier-v1
+description: Orchestrator verifier actor — evaluates acceptance criteria against recorded evidence and records adjudications via POST /verify. Never claims, submits, authors code, approves, or merges.
+capabilities:
+  - event_emit
+prohibited:
+  - task_claim
+  - repository_write
+  - merge_to_main
+  - change_approval
+  - infra_mutation
+  - secret_write
+  - credential_create
+  - credential_revoke
+  - outward_publish
