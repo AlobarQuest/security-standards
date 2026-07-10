@@ -6,20 +6,20 @@ requires-python = ">=3.12"
 [project.optional-dependencies]
 dev = [
   "pytest>=9.1.1",
-  "jsonschema>=4.21",
+  "jsonschema>=4.26.0",
   "pyyaml>=6.0.3",
   "psycopg[binary]>=3.1",
   "ruff==0.15.21",
   "pyright==1.1.411",
 ]
-events = ["jsonschema>=4.21", "psycopg[binary]>=3.1", "pyyaml>=6.0.3"]
+events = ["jsonschema>=4.26.0", "psycopg[binary]>=3.1", "pyyaml>=6.0.3"]
 
 [dependency-groups]
 # `uv sync` installs the default dev group in the generic Quality workflow.
 # Keep the optional `dev` extra above for security-scan.yml's pip install path.
 dev = [
   "pytest>=9.1.1",
-  "jsonschema>=4.21",
+  "jsonschema>=4.26.0",
   "pyyaml>=6.0.3",
   "psycopg[binary]>=3.1",
   "ruff==0.15.21",
