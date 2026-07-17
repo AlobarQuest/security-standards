@@ -392,25 +392,25 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "jsonschema", marker = "extra == 'dev'", specifier = ">=4.21" },
-    { name = "jsonschema", marker = "extra == 'events'", specifier = ">=4.21" },
-    { name = "psycopg", extras = ["binary"], marker = "extra == 'dev'", specifier = ">=3.1" },
-    { name = "psycopg", extras = ["binary"], marker = "extra == 'events'", specifier = ">=3.1" },
+    { name = "jsonschema", marker = "extra == 'dev'", specifier = ">=4.26.0" },
+    { name = "jsonschema", marker = "extra == 'events'", specifier = ">=4.26.0" },
+    { name = "psycopg", extras = ["binary"], marker = "extra == 'dev'", specifier = ">=3.3.4" },
+    { name = "psycopg", extras = ["binary"], marker = "extra == 'events'", specifier = ">=3.3.4" },
     { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.411" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
-    { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
-    { name = "pyyaml", marker = "extra == 'events'", specifier = ">=6.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.1.1" },
+    { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.3" },
+    { name = "pyyaml", marker = "extra == 'events'", specifier = ">=6.0.3" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.15.21" },
 ]
 provides-extras = ["dev", "events"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "jsonschema", specifier = ">=4.21" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.1" },
+    { name = "jsonschema", specifier = ">=4.26.0" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
     { name = "pyright", specifier = "==1.1.411" },
-    { name = "pytest", specifier = ">=7.0" },
-    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "pytest", specifier = ">=9.1.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "ruff", specifier = "==0.15.21" },
 ]
 
