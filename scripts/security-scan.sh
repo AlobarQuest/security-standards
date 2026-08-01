@@ -84,11 +84,14 @@ echo "=== security-scan $TS ===" | tee "$LOG"
 for f in "$HOME/.zshrc" "$HOME/.zshenv"; do
   [ -f "$f" ] || continue
   # export NAME=<starts with quote+alnum or alnum> ; exclude $(...) keychain lookups
+  # The `grep -vF '$('` below is a fixed-string PATTERN, not a shell expansion —
+  # single quotes are exactly what is wanted; expanding it would break the detector.
+  # shellcheck disable=SC2016
   while IFS= read -r line; do
     # emit the KEY NAME ONLY — never the value (the detector must not log secrets)
     key="$(printf '%s' "$line" | sed -E 's/.*export[[:space:]]+([A-Za-z_]+)=.*/\1/')"
     emit FAIL "shell.plaintext_secret" "$f: $key=<inline value> (move to Keychain)"
-  done < <(grep -E '^[[:space:]]*export[[:space:]]+[A-Za-z_]*(API_KEY|TOKEN|SECRET|PASSWORD)=["'"'"']?[A-Za-z0-9]' "$f" 2>/dev/null | grep -v '\$(' || true)
+  done < <(grep -E '^[[:space:]]*export[[:space:]]+[A-Za-z_]*(API_KEY|TOKEN|SECRET|PASSWORD)=["'"'"']?[A-Za-z0-9]' "$f" 2>/dev/null | grep -vF '$(' || true)
 done
 
 # ---------------------------------------------------------------------------
@@ -180,7 +183,7 @@ fi
 # ---------------------------------------------------------------------------
 # 7. Supply-chain pins
 # ---------------------------------------------------------------------------
-have rtk && emit PASS supply.rtk "rtk present ($(rtk --version 2>/dev/null | head -1))" || emit FAIL supply.rtk_missing "rtk not on PATH"
+if have rtk; then emit PASS supply.rtk "rtk present ($(rtk --version 2>/dev/null | head -1))"; else emit FAIL supply.rtk_missing "rtk not on PATH"; fi
 OCTO="$HOME/Developer/devon-plugins/octo"
 INSTALLED="$HOME/.claude/plugins/installed_plugins.json"
 if [ -d "$OCTO/.git" ]; then
@@ -204,10 +207,12 @@ fi
 # 8. OS hardening toggles
 # ---------------------------------------------------------------------------
 ap="$(defaults read com.apple.screensaver askForPassword 2>/dev/null || echo 0)"
-[ "$ap" = "1" ] && emit PASS os.screen_lock "askForPassword on" || emit FAIL os.screen_lock "screen lock off (askForPassword=$ap)"
+if [ "$ap" = "1" ]; then emit PASS os.screen_lock "askForPassword on"; else emit FAIL os.screen_lock "screen lock off (askForPassword=$ap)"; fi
 cu="$(defaults read /Library/Preferences/com.apple.SoftwareUpdate CriticalUpdateInstall 2>/dev/null || echo 0)"
-[ "$cu" = "1" ] && emit PASS os.critical_updates "critical updates on" || emit FAIL os.critical_updates "critical updates off"
-if have spctl; then spctl --status 2>/dev/null | grep -q 'assessments enabled' && emit PASS os.gatekeeper "Gatekeeper on" || emit FAIL os.gatekeeper "Gatekeeper off"; fi
+if [ "$cu" = "1" ]; then emit PASS os.critical_updates "critical updates on"; else emit FAIL os.critical_updates "critical updates off"; fi
+if have spctl; then
+  if spctl --status 2>/dev/null | grep -q 'assessments enabled'; then emit PASS os.gatekeeper "Gatekeeper on"; else emit FAIL os.gatekeeper "Gatekeeper off"; fi
+fi
 
 # ---------------------------------------------------------------------------
 # 9. World-writable backup keys (stale iMac dir)
