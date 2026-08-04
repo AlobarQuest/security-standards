@@ -178,6 +178,12 @@ path = "~/Projects/vps-backup"
 class = "consumer"
 uses_bws = true
 
+[[repo]]
+name = "intent-packages"
+path = "~/Projects/intent-packages"
+class = "consumer"
+uses_bws = true
+
 # ───────────────────── Runtime state (deliberately repo-less) ─────────────────────
 [[runtime_dir]]
 path = "~/.config/infra-drift"
