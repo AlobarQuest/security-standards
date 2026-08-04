@@ -7,6 +7,7 @@ purpose: 'Deterministic + judgment-based enforcement of security standards (v1: 
 version: 0.1.0
 version_source: pyproject
 updated: '2026-06-26'
+delivery_profile: dependency-update
 foundation: true
 foundation_contract: 1
 applicable_standards:
