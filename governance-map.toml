@@ -128,6 +128,21 @@ owns = ["security_scan (python package)", "security-scan.sh", "skills-security-s
 consumers = ["security-standards", "infraops-mcp-server", "change-manager"]
 
 [[repo]]
+name = "factory-runner"
+path = "~/Projects/factory-runner"
+class = "tool-home"
+lane = "execute"
+owns = [
+  "factory_runner (python CLI, installed per run)",
+  ".github/workflows/factory-runner.yml (the reusable workflow every caller invokes)",
+  "RECOMMENDED_CALLER_PIN (the revision callers are expected to pin)",
+]
+# Consumers pin a full SHA in their own .github/workflows/factory-runner-pilot.yml; the
+# caller's `uses:` SHA IS the installed CLI revision (WS-P2.23). So a merge here reaches
+# nobody until a consumer deliberately advances its pin -- see the tool-home landing rule.
+consumers = ["intent-packages", "orchestrator", "change-manager", "brain", "security-standards", "infraops-mcp-server"]
+
+[[repo]]
 name = "infraops-mcp-server"
 path = "~/Projects/infraops-mcp-server"
 class = "tool-home"
