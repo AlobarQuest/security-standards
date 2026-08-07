@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: orchestrator-observer
+version: 1
+status: active
+runtime: node-executor
+operator: devon
+environment: any
+description: The shared observe-and-report identity. Every producer that records observations into the orchestrator authenticates as this actor; the observation row's own source_system and source_reference say which producer spoke, so the credential does not have to. Holds the OBSERVER role, whose entire write surface is POST /api/v1/observations.
+authority_profile: observer-v1
+capabilities: []
+prohibited: []

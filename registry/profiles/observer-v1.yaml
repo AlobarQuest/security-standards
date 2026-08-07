@@ -1,0 +1,20 @@
+schema: authority-profile/v1
+profile: observer-v1
+description: Records observations and does nothing else. Observes, never proposes and never mutates — strictly narrower than drift-sync-v1, which may also file changes and send mail. `event_emit` is the nearest term in registry/capabilities.yaml for "appends an observation row and its event"; if a distinct observation_record term is wanted, that is a vocabulary addition and a separate decision.
+capabilities:
+  - event_emit
+prohibited:
+  - repository_write
+  - pr_open
+  - merge_to_main
+  - infra_mutation
+  - change_filing
+  - change_approval
+  - secret_write
+  - credential_create
+  - credential_revoke
+  - email_send
+  - task_claim
+  - outward_publish
+  - external_system_write
+  - data_delete
