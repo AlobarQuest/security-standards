@@ -121,3 +121,24 @@ def test_real_registry_validates_and_covers_ws11_vocabulary():
         "open-engine-runner",
         "unknown",
     } <= registered_ids()
+
+
+def test_the_change_manager_event_actors_resolve_to_themselves() -> None:
+    """ADR-0019 increment 5a. Without these entries the chain attributes them to nobody.
+
+    `change.approved` is the only event change-manager emits that becomes an `authority_grant`,
+    and the grant's approver is the event's actor — so `deploy-policy` failing to resolve would
+    put the one authorization permitting an autonomous production deploy into the tamper-evident
+    chain as `unknown`. That chain visibility is the argument that decided increment 5a's central
+    fork, which makes this the fork's own property rather than housekeeping.
+
+    Asserted through `_map_actor` rather than `registered_ids()`, because resolution is what the
+    adapter actually does and a registered id that failed to map would satisfy the weaker check.
+    The final case is the control: without it this test passes on an adapter that returns its
+    argument unchanged for everything.
+    """
+    from factory_events.adapters.change_manager import _map_actor
+
+    assert _map_actor("deploy-policy") == "deploy-policy"
+    assert _map_actor("change-proposer") == "change-proposer"
+    assert _map_actor("an-id-nobody-registered") == "unknown"

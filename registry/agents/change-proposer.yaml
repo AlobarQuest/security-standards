@@ -1,0 +1,24 @@
+schema: agent-identity/v1
+agent_id: change-proposer
+version: 1
+status: active
+runtime: claude-code
+operator: devon
+environment: mini
+description: >-
+  The out-of-process program that proposes a change record for every deploying merge waiting to
+  happen (ADR-0019 increment 4/5a; `src/change_proposer/` in AlobarQuest/orchestrator, run hourly
+  by the `com.devon.change-proposer` LaunchAgent). It writes ONE route — the proposal ingress —
+  holding a propose-scoped change-manager bearer that is refused every route by which a caller
+  could choose a record's status. It appears as the `actor` on `change.proposed` and
+  `change.criteria_refreshed` events; the `change.approved` event that follows a conformant
+  proposal is attributed to `deploy-policy` instead, because the policy decided it and this
+  program did not.
+authority_profile: none-v1
+capabilities: []
+prohibited:
+  - change_approval
+  - repository_write
+  - pr_open
+  - merge_to_main
+  - infra_mutation
