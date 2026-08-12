@@ -1,0 +1,23 @@
+schema: agent-identity/v1
+agent_id: deploy-policy
+version: 1
+status: active
+runtime: unknown
+operator: devon
+environment: any
+description: >-
+  The approver recorded when change-manager approves a deploying-merge change by conformance to
+  its pinned, versioned deploy policy (ADR-0019 increment 5a). A LABEL, NOT A RUNTIME — the same
+  kind of entry as `unknown`. Nothing runs under this identity, no credential authenticates as it,
+  and it appears only as the `actor` on a `change.approved` event and the `approver` on the
+  authority grant that event becomes in the factory-events chain. It exists because that adapter
+  maps an unregistered actor to `unknown`, and the one authorization permitting an autonomous
+  production deploy is the last thing that should reach the chain attributed to nobody. The policy
+  VERSION travels in the record's `policy_version` column and in the event detail, never in this
+  string, so the identity stays stable as the policy is revised.
+  `runtime: unknown` / `environment: any` mirror `unknown` — the registry's established
+  shape for a label — rather than naming where change-manager happens to run, because
+  nothing executes here and a runtime named for it would be the one false field.
+authority_profile: none-v1
+capabilities: []
+prohibited: []
