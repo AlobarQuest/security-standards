@@ -1,4 +1,11 @@
-# code-standards:managed:start — everything down to :end is replaced by `code-standards sync`.
+# LOCALLY OWNED as of 2026-08-15 (code-standards ADR-0008). The `code-standards:managed`
+# markers were deliberately removed. This file now carries a `schedule:` trigger that runs
+# the gate against `main` on a clock, and sync replaces the whole managed block, so leaving
+# the markers in place meant the next sync would delete that trigger with nothing reporting
+# it. The shared template cannot carry the trigger instead: the cron minute is staggered per
+# repository, and most repositories that vendor this file are not in the lane it exists for.
+# `code-standards sync` now writes nothing here and says so on every run -- a reported state,
+# not a silent one. Re-adding both marker lines restores block ownership.
 # code-standards GitHub Actions workflow (vendored).
 # Destination: .github/workflows/quality.yml
 # Edit upstream and `code-standards sync`.
@@ -41,6 +48,22 @@ on:
     branches: ["**"]
   pull_request:
     branches: ["**"]
+  # A daily run of this same gate against the default branch, added 2026-08-15.
+  # The Dependabot cascade arms with the token the CI platform supplies, and a landing
+  # made with that token fires no `push` event -- so a bump can reach `main` with this
+  # gate never having run on the result. Asking the question on a clock closes that
+  # hole without changing which identity lands the pull request.
+  #
+  # It does NOT attribute a failure to the commit that caused it: a red scheduled run
+  # means bisecting the day's landings. That is the accepted cost of leaving the
+  # arming identity alone; the tightening that would remove it is a separate decision.
+  #
+  # The minute is off the hour on purpose -- runs queued at :00 are delayed -- and is
+  # staggered against the other five lane repositories. Times are UTC: 10:39 is after
+  # the 02:00-06:00 window in which this estate lands changes unattended, so an
+  # overnight landing is checked the same morning.
+  schedule:
+    - cron: "39 10 * * *"
 
 jobs:
   check:
@@ -133,4 +156,3 @@ jobs:
         # `[dependency-groups]`, the installer above will not put them in place
         # and this step now fails loudly instead of going green having run nothing.
         run: make check
-# code-standards:managed:end — content OUTSIDE these markers is yours and is preserved. Delete both markers to own the whole file: sync then writes nothing here and says so every run.
