@@ -58,7 +58,7 @@
 OBSERVE_SOURCE_SYSTEM="recovery_floor"
 OBSERVE_API_BASE="${OBSERVE_API_BASE:-https://sds.alobar.net}"
 OBSERVE_CREDENTIAL_KEY_ID="${OBSERVE_CREDENTIAL_KEY_ID:-orchestrator-drift-reporter}"
-OBSERVE_SECRET_ID="${OBSERVE_SECRET_ID:-8998c4ea-453c-4ae1-9b5c-b49500b8dacc}"
+BWS_OBSERVE_SECRET_ID="${BWS_OBSERVE_SECRET_ID:-8998c4ea-453c-4ae1-9b5c-b49500b8dacc}"
 # Keychain account used only when the caller has no BWS token of its own. This is the broad
 # machine account (one account behind both BWS_ACCESS_TOKEN_VPS_BACKUP and
 # BWS_ACCESS_TOKEN_INFRA_DRIFT); the narrow `sds-operator` identity cannot read this secret.
@@ -217,6 +217,6 @@ observe_bearer() {
     [ -n "$bws_token" ] || return 0
     command -v bws >/dev/null 2>&1 || return 0
     BWS_ACCESS_TOKEN="$bws_token" env -u FORCE_COLOR -u CLICOLOR_FORCE \
-        bws secret get "$OBSERVE_SECRET_ID" --output json --color no 2>/dev/null \
+        bws secret get "$BWS_OBSERVE_SECRET_ID" --output json --color no 2>/dev/null \
         | python3 -c 'import sys,json; print(json.load(sys.stdin)["value"])' 2>/dev/null || true
 }
