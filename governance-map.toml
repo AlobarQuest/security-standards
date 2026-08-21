@@ -93,6 +93,21 @@ artifact_class = "deployed"
 deploy_target = "~/.claude/bin/observe-run.sh"
 mode = "755"
 
+# Sourced by every scheduled launcher in the estate — in six repositories, not only this one — to
+# pull the working copy it is about to read. The estate's Dependabot cascade stops at the merge,
+# which leaves a machine-local consumer running code that landed days ago (ADR-0031). Deployed
+# rather than copied per repository for the reason `observe-run.sh` is a cautionary tale: six
+# copies of one rule is where drift lives. Best-effort by construction — a caller that cannot read
+# it defines a no-op and says so, and the helper itself never returns non-zero.
+[[tool]]
+name = "activate-checkout.sh"
+lane = "detect"
+home_repo = "security-standards"
+source = "scripts/activate-checkout.sh"
+artifact_class = "deployed"
+deploy_target = "~/.claude/bin/activate-checkout.sh"
+mode = "755"
+
 # ───────────────────── Control-plane host (version-control home of ~/.claude/) ─────────────────────
 # The ~/.claude/ directory is itself a git repo. It is NOT governed by security-standards
 # (no detect/mutate/approve lane) — it is the version-control HOME of the global config and
