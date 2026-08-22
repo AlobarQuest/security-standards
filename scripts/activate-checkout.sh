@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # activate-checkout.sh — bring a working copy up to date before the job that reads it runs.
 #
-# Source of truth: ~/Projects/security-standards/scripts/activate-checkout.sh
-# Deployed to:     ~/.claude/bin/activate-checkout.sh  (governance-map.toml, `make install`)
+# Source of truth: ~/Projects/security-standards/scripts/activate-checkout.sh (deployed → ~/.claude/bin/activate-checkout.sh)
 # Edit here, not in place; then: cd ~/Projects/security-standards && make install
 #
 # WHY THIS EXISTS. The estate's Dependabot cascade (ADR-0016/0018/0023) arms auto-merge and stops
