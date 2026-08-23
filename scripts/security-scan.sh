@@ -225,8 +225,22 @@ fi
 # ---------------------------------------------------------------------------
 ap="$(defaults read com.apple.screensaver askForPassword 2>/dev/null || echo 0)"
 if [ "$ap" = "1" ]; then emit PASS os.screen_lock "askForPassword on"; else emit FAIL os.screen_lock "screen lock off (askForPassword=$ap)"; fi
+# CriticalUpdateInstall is AUTO-APPLY, and auto-apply being off is this machine's DELIBERATE
+# posture (Devon, 2026-08-23) -- critical patches are applied on purpose rather than unattended.
+# It was a FAIL, so the weekly scan could never go green and reported a decision back as a
+# defect. A control that can never pass is one nobody reads, which this estate has now removed
+# from four other places.
+#
+# It still REPORTS the observed value, so a change of posture is visible; it no longer asserts
+# one. Note what this check therefore does NOT establish: whether critical patches are actually
+# OUTSTANDING. That is the falsifiable question and it is a different probe (`softwareupdate -l`),
+# deliberately not built here -- see the backlog rather than assuming this covers it.
 cu="$(defaults read /Library/Preferences/com.apple.SoftwareUpdate CriticalUpdateInstall 2>/dev/null || echo 0)"
-if [ "$cu" = "1" ]; then emit PASS os.critical_updates "critical updates on"; else emit FAIL os.critical_updates "critical updates off"; fi
+if [ "$cu" = "1" ]; then
+  emit PASS os.critical_updates "auto-apply on"
+else
+  emit PASS os.critical_updates "auto-apply off (deliberate on this machine; patches applied on purpose)"
+fi
 if have spctl; then
   if spctl --status 2>/dev/null | grep -q 'assessments enabled'; then emit PASS os.gatekeeper "Gatekeeper on"; else emit FAIL os.gatekeeper "Gatekeeper off"; fi
 fi
