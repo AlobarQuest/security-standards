@@ -30,6 +30,23 @@ set -uo pipefail   # deliberately NOT -e: run every check, don't abort early
 # (Mirrors the read-guard interpreter pin: don't trust the ambient PATH for
 # resolving our own dependencies.)
 export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+# ACTIVATION — a merged change is not live on this machine until the code is pulled. The estate's
+# Dependabot cascade stops at the merge, which is complete for a repository whose landing redeploys
+# a hosted application and incomplete for this one, whose code runs from a working copy here
+# (ADR-0031). Best-effort by construction: the helper prints one `[activation]` line and returns 0
+# whatever it finds, so this job is never gated on being able to update itself.
+_SDS_ACTIVATE="$HOME/.claude/bin/activate-checkout.sh"
+if [ -r "$_SDS_ACTIVATE" ]; then
+    # shellcheck source=/dev/null
+    . "$_SDS_ACTIVATE"
+else
+    activate_checkout() {
+        echo "[activation] helper missing at $HOME/.claude/bin/activate-checkout.sh —" \
+             "this run is not activated"
+    }
+fi
+activate_checkout "$HOME/Projects/security-standards"
+
 
 # Pin a Python >= 3.11 for our own module subprocesses (read-guard self-check,
 # governance verify). `tomllib` — used by security_scan.governance/manifest/allowlist
@@ -208,8 +225,22 @@ fi
 # ---------------------------------------------------------------------------
 ap="$(defaults read com.apple.screensaver askForPassword 2>/dev/null || echo 0)"
 if [ "$ap" = "1" ]; then emit PASS os.screen_lock "askForPassword on"; else emit FAIL os.screen_lock "screen lock off (askForPassword=$ap)"; fi
+# CriticalUpdateInstall is AUTO-APPLY, and auto-apply being off is this machine's DELIBERATE
+# posture (Devon, 2026-08-23) -- critical patches are applied on purpose rather than unattended.
+# It was a FAIL, so the weekly scan could never go green and reported a decision back as a
+# defect. A control that can never pass is one nobody reads, which this estate has now removed
+# from four other places.
+#
+# It still REPORTS the observed value, so a change of posture is visible; it no longer asserts
+# one. Note what this check therefore does NOT establish: whether critical patches are actually
+# OUTSTANDING. That is the falsifiable question and it is a different probe (`softwareupdate -l`),
+# deliberately not built here -- see the backlog rather than assuming this covers it.
 cu="$(defaults read /Library/Preferences/com.apple.SoftwareUpdate CriticalUpdateInstall 2>/dev/null || echo 0)"
-if [ "$cu" = "1" ]; then emit PASS os.critical_updates "critical updates on"; else emit FAIL os.critical_updates "critical updates off"; fi
+if [ "$cu" = "1" ]; then
+  emit PASS os.critical_updates "auto-apply on"
+else
+  emit PASS os.critical_updates "auto-apply off (deliberate on this machine; patches applied on purpose)"
+fi
 if have spctl; then
   if spctl --status 2>/dev/null | grep -q 'assessments enabled'; then emit PASS os.gatekeeper "Gatekeeper on"; else emit FAIL os.gatekeeper "Gatekeeper off"; fi
 fi
