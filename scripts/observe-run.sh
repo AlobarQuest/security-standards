@@ -118,12 +118,14 @@ observe_report() {
     elif [ "$warnings" -gt 0 ]; then status="degraded"; severity="warning"
     else status="passed"; severity="info"
     fi
-    token="$(observe_bearer)"
+    observe_resolve_bearer
+    token="$OBSERVE_BEARER_VALUE"
 
     (
         set +e
         OBSERVE_RC="$rc" OBSERVE_WARNINGS="$warnings" OBSERVE_STAGE="$stage" \
         OBSERVE_STATUS="$status" OBSERVE_SEVERITY="$severity" OBSERVE_TOKEN="$token" \
+        OBSERVE_BEARER_REASON="${OBSERVE_BEARER_REASON:-}" \
         python3 - <<'OBSERVE_PY' 2>&1
 import json, os, sys, urllib.error, urllib.request
 
@@ -181,7 +183,11 @@ emit("observation payload: " + json.dumps(command, sort_keys=True))
 
 token = os.environ.get("OBSERVE_TOKEN", "")
 if not token:
-    emit("WARNING: observation not posted — no orchestrator bearer available (non-fatal)")
+    # WHICH precondition failed. The bare "no orchestrator bearer available" stood in one lane's
+    # log for 28 nights while the cause was a single absent PATH entry — a diagnosis nobody could
+    # make from the message.
+    reason = os.environ.get("OBSERVE_BEARER_REASON", "") or "no orchestrator bearer available"
+    emit(f"WARNING: observation not posted — {reason} (non-fatal)")
     raise SystemExit(0)
 
 request = urllib.request.Request(
@@ -206,17 +212,47 @@ OBSERVE_PY
     return 0
 }
 
-# Empty string when unavailable — the poster then logs a WARN and posts nothing.
-observe_bearer() {
-    if [ -n "${OBSERVE_BEARER:-}" ]; then printf '%s' "$OBSERVE_BEARER"; return 0; fi
-    local bws_token="${BWS_ACCESS_TOKEN:-}"
+# Empty string when unavailable — the poster then logs a WARN and posts nothing, naming WHICH
+# precondition failed rather than only that one did.
+#
+# RESOLVED WITHOUT A SUBSHELL, deliberately. The reason is a global, and `$(observe_bearer)` runs
+# in a subshell that would discard it — so the poster calls `observe_resolve_bearer` and reads both
+# values. `observe_bearer` stays as the printing form for any caller that wants one.
+observe_resolve_bearer() {
+    OBSERVE_BEARER_VALUE=""
+    OBSERVE_BEARER_REASON=""
+    if [ -n "${OBSERVE_BEARER:-}" ]; then OBSERVE_BEARER_VALUE="$OBSERVE_BEARER"; return 0; fi
+    local bws_token="${BWS_ACCESS_TOKEN:-}" bws_bin
     if [ -z "$bws_token" ]; then
         bws_token="$(/usr/bin/security find-generic-password \
             -s 'Claude' -a "$OBSERVE_KEYCHAIN_ACCOUNT" -w 2>/dev/null || true)"
     fi
-    [ -n "$bws_token" ] || return 0
-    command -v bws >/dev/null 2>&1 || return 0
-    BWS_ACCESS_TOKEN="$bws_token" env -u FORCE_COLOR -u CLICOLOR_FORCE \
-        bws secret get "$BWS_OBSERVE_SECRET_ID" --output json --color no 2>/dev/null \
-        | python3 -c 'import sys,json; print(json.load(sys.stdin)["value"])' 2>/dev/null || true
+    if [ -z "$bws_token" ]; then
+        OBSERVE_BEARER_REASON="no BWS identity: neither BWS_ACCESS_TOKEN nor Keychain Claude/$OBSERVE_KEYCHAIN_ACCOUNT"
+        return 0
+    fi
+    # RESOLVED ABSOLUTELY WHEN PATH DOES NOT CARRY IT, the same way this file already reaches
+    # `/usr/bin/security`. launchd gives a job only the PATH its plist declares, and `bws` is
+    # installed in /usr/local/bin — so a lane whose plist omits that directory fetches nothing and
+    # reports something else. Measured 2026-09-16: `com.devon.factory-events` had posted NOTHING in
+    # 28 nights while its three sibling recovery-floor lanes posted 116 observations between them,
+    # and the only difference was that one PATH entry.
+    bws_bin="$(command -v bws 2>/dev/null || true)"
+    if [ -z "$bws_bin" ] && [ -x /usr/local/bin/bws ]; then bws_bin="/usr/local/bin/bws"; fi
+    if [ -z "$bws_bin" ]; then
+        OBSERVE_BEARER_REASON="bws is neither on PATH nor at /usr/local/bin/bws"
+        return 0
+    fi
+    OBSERVE_BEARER_VALUE="$(BWS_ACCESS_TOKEN="$bws_token" env -u FORCE_COLOR -u CLICOLOR_FORCE \
+        "$bws_bin" secret get "$BWS_OBSERVE_SECRET_ID" --output json --color no 2>/dev/null \
+        | python3 -c 'import sys,json; print(json.load(sys.stdin)["value"])' 2>/dev/null || true)"
+    if [ -z "$OBSERVE_BEARER_VALUE" ]; then
+        OBSERVE_BEARER_REASON="bws could not read the observer credential"
+    fi
+    return 0
+}
+
+observe_bearer() {
+    observe_resolve_bearer
+    printf '%s' "$OBSERVE_BEARER_VALUE"
 }
