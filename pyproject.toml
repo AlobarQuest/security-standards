@@ -9,7 +9,7 @@ dev = [
   "jsonschema>=4.26.0",
   "pyyaml>=6.0.3",
   "psycopg[binary]>=3.3.5",
-  "ruff>=0.16.7",
+  "ruff>=0.16.8",
   "pyright==1.1.414",
 ]
 events = ["jsonschema>=4.26.0", "psycopg[binary]>=3.3.5", "pyyaml>=6.0.3"]
@@ -22,7 +22,7 @@ dev = [
   "jsonschema>=4.26.0",
   "pyyaml>=6.0.3",
   "psycopg[binary]>=3.3.5",
-  "ruff>=0.16.7",
+  "ruff>=0.16.8",
   "pyright==1.1.414",
 ]
 
