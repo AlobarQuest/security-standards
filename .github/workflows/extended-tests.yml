@@ -1,0 +1,79 @@
+# Tests that the default gate (quality.yml -> `make check`) cannot run, each in a job that
+# supplies what the test needs. Added 2026-09-27: before this, both sets were collected
+# nowhere in CI -- the Python 3.9 import-safety tests skip on any runner without 3.9, and
+# the factory-store tests are deselected by `addopts = "-m 'not integration'"` with no
+# workflow running `-m integration` (docs/decisions/2026-07-06-factory-store-integration-gate.md).
+#
+# LOCALLY OWNED and deliberately a separate file: quality.yml is the vendored gate, and
+# keeping these jobs out of it means no `code-standards` sync or template change can touch
+# them. They are NOT required status checks; making them required is a branch-protection
+# decision.
+
+name: Extended tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  read-guard-py39:
+    name: Read-guard imports under Python 3.9
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Two interpreters: 3.12 runs pytest (the package's floor), and 3.9 is the
+      # hook's deploy-time interpreter, which the test finds as `python3.9` on PATH.
+      # The last listed version is the default `python`.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: |
+            3.9
+            3.12
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.5.x"
+
+      - run: uv sync --frozen
+
+      - name: Python 3.9 import-safety tests (fail, never skip, if 3.9 is missing)
+        env:
+          SECURITY_STANDARDS_REQUIRE_PY39: "1"
+        run: .venv/bin/python -m pytest tests/test_read_guard_py39_compat.py -v -rs
+
+  integration:
+    name: Factory-store integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: factory_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      FACTORY_TEST_DSN: postgresql://postgres:postgres@127.0.0.1:5432/factory_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.5.x"
+
+      - run: uv sync --frozen
+
+      - name: make check-integration
+        run: make check-integration

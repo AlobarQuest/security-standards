@@ -49,6 +49,10 @@ def _find_py39():
 def test_read_guard_module_imports_under_python39(module):
     py39 = _find_py39()
     if not py39:
+        # The CI job that exists to run this sets the variable, so a runner that
+        # lost its 3.9 fails there instead of going green having checked nothing.
+        if os.environ.get("SECURITY_STANDARDS_REQUIRE_PY39"):
+            pytest.fail("SECURITY_STANDARDS_REQUIRE_PY39 is set but no Python 3.9 was found")
         pytest.skip("no Python 3.9 interpreter available to test hook-deploy import safety")
     r = subprocess.run(
         [py39, "-c", f"import {module}"],
