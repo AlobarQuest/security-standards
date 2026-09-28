@@ -30,9 +30,9 @@ _ACTOR_MAP = {
 # What each change-manager event type says about the change it is recorded against, in the
 # envelope's `result` vocabulary. ONE RULE, so the table can be re-derived rather than trusted:
 #
-#   success -- the event records the change advancing or a decision on it concluding;
-#   failure -- the event records the change's own work failing, or a resolution not holding;
-#   unknown -- the work is still in flight, or the outcome is not in the event type at all.
+#   success -- an act on the record concluded: it was created, updated, decided or completed;
+#   failure -- the change's own work failed, or an approval or resolution stopped holding;
+#   unknown -- the work is still in flight, or the event type alone does not say which.
 #
 # That is the precedent this repository already set for other producers (`queue.claim` ->
 # unknown, `queue.done` -> success, `queue.blocked` -> failure; the high-power adapter's pre-call
@@ -51,21 +51,25 @@ _RESULT_MAP = {
     "ingested": "success",
     "criteria_refreshed": "success",
     "approved": "success",
-    "policy_revoked": "success",
     "deferred": "success",
     "wontfixed": "success",
     "resolved": "success",
     "reactivated": "success",
-    "retired": "success",
     "settled": "success",
-    "pr_linked": "success",
-    "handed_off": "success",
-    # A resolution that did not hold: drift reappeared after the record was closed, or a handoff
-    # went unresolved long enough for the watchdog to take it back.
+    # An approval or a resolution that did not hold: the policy withdrew an approval the record
+    # no longer earns, drift reappeared after the record was closed, or a handoff went
+    # unresolved long enough for the watchdog to take it back.
+    "policy_revoked": "failure",
     "regression_reopened": "failure",
     "handoff_watchdog_reverted": "failure",
-    # An executor's attempt, claimed and then concluded.
+    # ONE TYPE, TWO OPPOSITE OUTCOMES. The deploy lane retires a record whose pull request closed
+    # unmerged (the change can no longer happen); the work lane retires one whose work is done.
+    "retired": "unknown",
+    # Work passed on or under way, not yet concluded.
+    "handed_off": "unknown",
+    "pr_linked": "unknown",
     "claimed": "unknown",
+    # An executor's attempt, concluded.
     "attempt_done": "success",
     "attempt_failed": "failure",
     "attempt_blocked": "failure",

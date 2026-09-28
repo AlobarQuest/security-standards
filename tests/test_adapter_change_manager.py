@@ -116,6 +116,10 @@ def test_every_classification_is_in_the_envelope_vocabulary():
         ("handoff_watchdog_reverted", "failure"),
         ("deploy_observed", "unknown"),
         ("proposed", "success"),
+        ("policy_revoked", "failure"),
+        ("retired", "unknown"),
+        ("handed_off", "unknown"),
+        ("pr_linked", "unknown"),
     ],
 )
 def test_the_result_an_event_type_reaches_the_chain_with(event_type, expected):
@@ -152,7 +156,7 @@ def test_actor_and_result_mapping_table():
         "drift-reconciler",
         "devon",
     ]
-    assert [e["result"] for e in events] == ["success", "failure", "success", "failure", "success"]
+    assert [e["result"] for e in events] == ["success", "failure", "unknown", "failure", "success"]
     assert events[4]["authority_grant"]["approver"] == "devon"
     assert all(e["authority_grant"] is None for e in events[:4])
 
