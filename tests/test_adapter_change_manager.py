@@ -57,13 +57,88 @@ def test_adapt_maps_fields_and_paginates():
     assert ev2["result"] == "success"
 
 
+# Every `event_type` change-manager emits, read from its source on 2026-09-28 (change-manager
+# `origin/main` f3f98ee). No cross-repo read happens here, so this list goes stale when
+# change-manager adds a type; re-derive it with
+#
+#   grep -rn 'event_type=\|_EVENT = \|_OUTCOME_STATUS\|_ACTIONS\|_decide(' app/
+#
+# in a change-manager checkout. Most are literals passed as `event_type=` to `record_event` or
+# `decide`. The rest are indirect: `_OUTCOME_STATUS` in app/api.py (attempt_done, attempt_failed,
+# attempt_blocked, resolved), the `_decide` routes and web `_ACTIONS` (approved, deferred,
+# wontfixed, resolved), and the module constants OBSERVED_EVENT (deploy_observed),
+# SETTLED_EVENT (settled) and RETIRED_EVENT (retired, in two modules).
+CHANGE_MANAGER_EVENT_TYPES = frozenset(
+    {
+        "proposed",
+        "ingested",
+        "criteria_refreshed",
+        "approved",
+        "policy_revoked",
+        "deferred",
+        "wontfixed",
+        "resolved",
+        "reactivated",
+        "retired",
+        "settled",
+        "pr_linked",
+        "handed_off",
+        "regression_reopened",
+        "handoff_watchdog_reverted",
+        "claimed",
+        "attempt_done",
+        "attempt_failed",
+        "attempt_blocked",
+        "deploy_observed",
+    }
+)
+
+
+def test_every_emitted_event_type_is_classified_and_nothing_else_is():
+    """A type change-manager emits that the map does not know reaches the chain as `unknown`
+    with nothing saying so. That is how 19 of the 20 did, `attempt_failed` among them. A key
+    it never emits is a classification of nothing, which is what hid it."""
+    assert set(change_manager._RESULT_MAP) == CHANGE_MANAGER_EVENT_TYPES
+
+
+def test_every_classification_is_in_the_envelope_vocabulary():
+    assert set(change_manager._RESULT_MAP.values()) <= {"success", "failure", "unknown"}
+
+
+@pytest.mark.parametrize(
+    ("event_type", "expected"),
+    [
+        ("attempt_failed", "failure"),
+        ("attempt_blocked", "failure"),
+        ("attempt_done", "success"),
+        ("claimed", "unknown"),
+        ("regression_reopened", "failure"),
+        ("handoff_watchdog_reverted", "failure"),
+        ("deploy_observed", "unknown"),
+        ("proposed", "success"),
+    ],
+)
+def test_the_result_an_event_type_reaches_the_chain_with(event_type, expected):
+    pages = {0: [_raw(1, event_type, "executor")], 1: []}
+    change_manager.adapt(fetch=_fake_fetch(pages))
+    [record] = list(store.iter_records())
+    assert record["event"]["result"] == expected
+
+
+def test_a_type_the_map_does_not_know_is_recorded_as_unknown_rather_than_halting():
+    pages = {0: [_raw(1, "not_a_real_type", "executor")], 1: []}
+    assert change_manager.adapt(fetch=_fake_fetch(pages)) == 1
+    [record] = list(store.iter_records())
+    assert record["event"]["result"] == "unknown"
+
+
 def test_actor_and_result_mapping_table():
     pages = {
         0: [
-            _raw(1, "applied", "executor"),
-            _raw(2, "failed", "executor"),
+            _raw(1, "attempt_done", "executor"),
+            _raw(2, "attempt_failed", "executor"),
             _raw(3, "pr_linked", "api"),
-            _raw(4, "stale_handoff", "watchdog"),
+            _raw(4, "handoff_watchdog_reverted", "watchdog"),
             _raw(5, "approved", "devon"),
         ],
         5: [],
@@ -77,7 +152,7 @@ def test_actor_and_result_mapping_table():
         "drift-reconciler",
         "devon",
     ]
-    assert [e["result"] for e in events] == ["success", "failure", "unknown", "unknown", "success"]
+    assert [e["result"] for e in events] == ["success", "failure", "success", "failure", "success"]
     assert events[4]["authority_grant"]["approver"] == "devon"
     assert all(e["authority_grant"] is None for e in events[:4])
 

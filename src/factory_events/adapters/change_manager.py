@@ -27,7 +27,53 @@ _ACTOR_MAP = {
     "executor": "change-window-agent",
     "devon": "devon",
 }
-_RESULT_MAP = {"applied": "success", "approved": "success", "failed": "failure"}
+# What each change-manager event type says about the change it is recorded against, in the
+# envelope's `result` vocabulary. ONE RULE, so the table can be re-derived rather than trusted:
+#
+#   success -- the event records the change advancing or a decision on it concluding;
+#   failure -- the event records the change's own work failing, or a resolution not holding;
+#   unknown -- the work is still in flight, or the outcome is not in the event type at all.
+#
+# That is the precedent this repository already set for other producers (`queue.claim` ->
+# unknown, `queue.done` -> success, `queue.blocked` -> failure; the high-power adapter's pre-call
+# record is unknown and its post-call record success).
+#
+# THE KEYS ARE CHANGE-MANAGER'S OWN `event_type` VALUES, every one it emits and nothing else.
+# Until 2026-09-28 this map was keyed {applied, approved, failed}, of which only `approved` was
+# ever emitted, so every other type -- `attempt_failed` included -- reached the chain as
+# `unknown`. The set is pinned by `tests/test_adapter_change_manager.py`, which says where it was
+# read from. A type missing here still maps to `unknown` rather than raising: this adapter runs
+# nightly and a halt would lose the rest of the page, so the pin, not the runtime, is what
+# notices a new type.
+_RESULT_MAP = {
+    # The record's lifecycle: created, updated, decided.
+    "proposed": "success",
+    "ingested": "success",
+    "criteria_refreshed": "success",
+    "approved": "success",
+    "policy_revoked": "success",
+    "deferred": "success",
+    "wontfixed": "success",
+    "resolved": "success",
+    "reactivated": "success",
+    "retired": "success",
+    "settled": "success",
+    "pr_linked": "success",
+    "handed_off": "success",
+    # A resolution that did not hold: drift reappeared after the record was closed, or a handoff
+    # went unresolved long enough for the watchdog to take it back.
+    "regression_reopened": "failure",
+    "handoff_watchdog_reverted": "failure",
+    # An executor's attempt, claimed and then concluded.
+    "claimed": "unknown",
+    "attempt_done": "success",
+    "attempt_failed": "failure",
+    "attempt_blocked": "failure",
+    # A rollout observation. Its verdict (success, failed, unknown or absent) is in the event's
+    # prose `detail`, not its type, and parsing prose would make the chain's `result` depend on
+    # wording nobody versions.
+    "deploy_observed": "unknown",
+}
 _GRANT_TYPES = {"approved"}
 
 
