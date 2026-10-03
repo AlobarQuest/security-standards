@@ -59,7 +59,7 @@ def _extract_target(args_summary: str) -> str | None:
     # adapters own their target conventions.
     try:
         args = json.loads(args_summary)
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         return None
     if not isinstance(args, dict):
         return None

@@ -11,7 +11,7 @@ jobs:
           fetch-depth: 0          # full history for the history-scope check
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
       - run: pip install -e .
       - name: Install test deps
         run: pip install -e ".[dev]"
