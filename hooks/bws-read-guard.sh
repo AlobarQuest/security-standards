@@ -8,12 +8,14 @@
 # Interpreter pin: the security_scan package targets Python >=3.12. The ambient
 # `python3` under macOS launchd resolves to system Python 3.9, which silently
 # broke the guard (fail-open) once before. Pin to a known >=3.12 interpreter so
-# execution matches the package's supported floor regardless of PATH. Fall back
+# execution matches the package's supported floor regardless of PATH. The uv-managed 3.14 comes
+# first; the uv path is absolute because launchd's PATH has no ~/.local/bin. Fall back
 # to ambient `python3` only as a last resort (the package is import-safe to 3.9).
 # Source of truth: ~/Projects/security-standards/hooks/bws-read-guard.sh (deployed → ~/.claude/hooks/bws-read-guard.sh)
 # Edit here, not in place; then: cd ~/Projects/security-standards && make install
 PYBIN=""
 for cand in \
+    "$HOME/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14" \
     /opt/homebrew/bin/python3.13 \
     /opt/homebrew/bin/python3.12 \
     /opt/homebrew/opt/python@3.12/libexec/bin/python3; do

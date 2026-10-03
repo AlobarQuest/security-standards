@@ -55,7 +55,8 @@ activate_checkout "$HOME/Projects/security-standards"
 # traceback surfaces as a false "drift" finding. The .venv path is absolute, so it
 # holds even under a hostile PATH. Don't trust ambient `python3`.
 PY=""
-for _cand in "$HOME/Projects/security-standards/.venv/bin/python" python3.12 python3.11 python3; do
+for _cand in "$HOME/Projects/security-standards/.venv/bin/python" \
+  "$HOME/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14" python3.12 python3.11 python3; do
   if command -v "$_cand" >/dev/null 2>&1 \
      && "$_cand" -c 'import sys, tomllib; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
     PY="$(command -v "$_cand")"; break

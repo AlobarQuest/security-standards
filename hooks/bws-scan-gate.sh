@@ -27,7 +27,19 @@ SCANNER_SRC="$HOME/Projects/security-standards/src"
 # gate), so skip those here rather than trap every non-repo session.
 git -C "$CWD" rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
 
-REPORT=$(PYTHONPATH="$SCANNER_SRC" python3 -m security_scan.cli "$CWD" --category security 2>/dev/null)
+# Same interpreter pin as bws-read-guard.sh: under a launchd or GUI PATH, bare `python3` is
+# Apple's 3.9, on which the scanner cannot import, and this gate would fail open unseen.
+PYBIN=""
+for cand in \
+    "$HOME/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14" \
+    /opt/homebrew/bin/python3.13 \
+    /opt/homebrew/bin/python3.12 \
+    /opt/homebrew/opt/python@3.12/libexec/bin/python3; do
+    [ -x "$cand" ] && PYBIN="$cand" && break
+done
+[ -n "$PYBIN" ] || PYBIN="python3"
+
+REPORT=$(PYTHONPATH="$SCANNER_SRC" "$PYBIN" -m security_scan.cli "$CWD" --category security 2>/dev/null)
 CODE=$?
 [ "$CODE" -eq 0 ] && exit 0   # clean, or scanner unavailable → don't trap the session
 
