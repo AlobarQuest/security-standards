@@ -48,7 +48,7 @@ fi
 activate_checkout "$HOME/Projects/security-standards"
 
 
-# Pin a Python >= 3.11 for our own module subprocesses (read-guard self-check,
+# Pin a Python >= 3.14 (the package floor) for our own module subprocesses (read-guard self-check,
 # governance verify). `tomllib` — used by security_scan.governance/manifest/allowlist
 # — is stdlib only on 3.11+, but a launchd/autonomous PATH can resolve bare `python3`
 # to Apple's /usr/bin 3.9 (no tomllib): the module then crashes at import and its
@@ -56,9 +56,9 @@ activate_checkout "$HOME/Projects/security-standards"
 # holds even under a hostile PATH. Don't trust ambient `python3`.
 PY=""
 for _cand in "$HOME/Projects/security-standards/.venv/bin/python" \
-  "$HOME/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14" python3.12 python3.11 python3; do
+  "$HOME/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14" python3.14 python3; do
   if command -v "$_cand" >/dev/null 2>&1 \
-     && "$_cand" -c 'import sys, tomllib; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
+     && "$_cand" -c 'import sys, tomllib; sys.exit(0 if sys.version_info >= (3, 14) else 1)' 2>/dev/null; then
     PY="$(command -v "$_cand")"; break
   fi
 done
@@ -296,7 +296,7 @@ fi
 #     read-guard is not protecting reads right now.
 # ---------------------------------------------------------------------------
 if [ -z "$PY" ]; then
-  emit WARN readguard.health "no python>=3.11 interpreter found; self-check skipped"
+  emit WARN readguard.health "no python>=3.14 interpreter found; self-check skipped"
 elif RG_OUT="$(PYTHONPATH="$HOME/Projects/security-standards/src" "$PY" -m security_scan.read_guard.selfcheck --canary 2>&1)"; then
   emit PASS readguard.health "read-guard wired + canary ok"
 else
@@ -340,7 +340,7 @@ if [ -f "$SECSTD/governance-map.toml" ] && [ -n "$PY" ]; then
     emit FAIL governance.artifacts_in_sync "$(printf '%s' "$gv_out" | tr '\n' ';')"
   fi
 elif [ -f "$SECSTD/governance-map.toml" ]; then
-  emit WARN governance.artifacts_in_sync "no python>=3.11 interpreter found; check skipped"
+  emit WARN governance.artifacts_in_sync "no python>=3.14 interpreter found; check skipped"
 fi
 # ---------------------------------------------------------------------------
 echo "=== summary: PASS=$PASS WARN=$WARN FAIL=$FAIL ===" | tee -a "$LOG"

@@ -153,7 +153,7 @@ def verify_headers(manifest: Manifest) -> list[tuple[str, str]]:
             continue
         try:
             text = _source_path(t, manifest).read_text()
-        except (FileNotFoundError, KeyError):
+        except FileNotFoundError, KeyError:
             problems.append((t.name, "missing"))
             continue
         if source_header_lines(t, manifest)[0] in text:

@@ -77,13 +77,13 @@ jobs:
         if: hashFiles('pyproject.toml', 'requirements.txt') != ''
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
 
       - name: Install uv
         if: hashFiles('pyproject.toml', 'requirements.txt') != ''
         uses: astral-sh/setup-uv@v5
         with:
-          version: "0.5.x"
+          version: "0.10.9"
 
       - name: Install Python dependencies
         if: hashFiles('pyproject.toml', 'requirements.txt') != ''

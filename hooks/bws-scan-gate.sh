@@ -32,9 +32,7 @@ git -C "$CWD" rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
 PYBIN=""
 for cand in \
     "$HOME/.local/share/uv/python/cpython-3.14-macos-aarch64-none/bin/python3.14" \
-    /opt/homebrew/bin/python3.13 \
-    /opt/homebrew/bin/python3.12 \
-    /opt/homebrew/opt/python@3.12/libexec/bin/python3; do
+    /opt/homebrew/bin/python3.14; do
     [ -x "$cand" ] && PYBIN="$cand" && break
 done
 [ -n "$PYBIN" ] || PYBIN="python3"

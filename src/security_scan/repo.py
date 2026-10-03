@@ -43,7 +43,7 @@ def grep_tracked(repo_path, pattern: str) -> list[Hit]:
     for rel in tracked_files(repo_path):
         try:
             text = (repo_path / rel).read_text(errors="ignore")
-        except (OSError, UnicodeDecodeError):
+        except OSError, UnicodeDecodeError:
             continue
         for i, line in enumerate(text.splitlines(), start=1):
             m = rx.search(line)

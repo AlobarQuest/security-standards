@@ -33,7 +33,7 @@ def _bws_json(*args) -> list | None:
         res = subprocess.run(
             ["bws", *args, "--output", "json"], capture_output=True, text=True, timeout=60
         )
-    except (OSError, subprocess.SubprocessError):
+    except OSError, subprocess.SubprocessError:
         return None
     if res.returncode != 0:
         return None
