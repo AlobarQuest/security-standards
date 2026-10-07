@@ -28,10 +28,13 @@ def build_enrich_map(secrets: list[dict], projects: list[dict]) -> dict[str, dic
 
 
 def _bws_json(*args) -> list | None:
-    """Run a read-only `bws ... --output json` command; None on any failure."""
+    """Run a read-only `bws ... --output json --color no` command; None on any failure."""
     try:
         res = subprocess.run(
-            ["bws", *args, "--output", "json"], capture_output=True, text=True, timeout=60
+            ["bws", *args, "--output", "json", "--color", "no"],
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
     except OSError, subprocess.SubprocessError:
         return None
