@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: rotation-executor
+version: 1
+status: active
+runtime: node-executor
+operator: devon
+environment: isolated-vm
+description: The credential-rotation executor (orchestrator ADR-0055), a deterministic program with no LLM, running as a service in a dedicated isolated OrbStack VM on the operator machine. It pulls approved rotation units from the orchestrator with its own WORKER bearer, and the orchestrator confines claims both ways - only this identity may claim a rotation unit, and it may claim nothing else.
+authority_profile: rotation-executor-v1
+capabilities: []
+prohibited: []
