@@ -1,0 +1,39 @@
+schema: authority-profile/v1
+profile: rotation-executor-v1
+description: >-
+  The credential-rotation executor (orchestrator ADR-0055). A deterministic, no-LLM program that
+  claims approved rotation units and does every step that moves a credential value: mint, stage,
+  store, distribute, verify, retire and confirm dead. The orchestrator confines its claims to
+  rotation units and confines rotation units to it. Each capability traces to an ADR-0055 line:
+  task_claim and event_emit to decision 1 and decision 9 (it claims units and files evidence);
+  repository_read to decision 1 (it checks the revision against intent-packages' git and reads the
+  registry); secret_read and secret_write to decision 4 (read on the admin projects, write on the
+  keeper projects and Rotation / Work); credential_create and credential_revoke to decision 3's
+  mint and retire-old steps and the per-class table; data_delete to decision 3 (the quarantine and
+  staging secrets are deleted after confirm-dead); infra_mutation to decision 4 and amendment 1's
+  Coolify token (env writes and restarts). Writing GitHub Actions secrets (increment 7) is not
+  granted here.
+capabilities:
+  - task_claim
+  - event_emit
+  - repository_read
+  - secret_read
+  - secret_write
+  - credential_create
+  - credential_revoke
+  - data_delete
+  - infra_mutation
+prohibited:
+  - repository_write
+  - test_execution
+  - pr_open
+  - merge_to_main
+  - drift_detection
+  - change_filing
+  - change_approval
+  - email_send
+  - outward_publish
+  - spend_money
+  - calendar_write
+  - third_party_contact
+  - external_system_write
