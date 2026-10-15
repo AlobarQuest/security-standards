@@ -7,10 +7,14 @@ from security_scan import repo
 
 _UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 _UUID_RX = re.compile(_UUID)
-# A UUID "referenced as a BWS secret" = a UUID on a line mentioning bws / a secret-id var.
-_BWS_LINE_RX = re.compile(r"(?i)(bws\s+secret|fetch_bws_secret|BWS_\w*SECRET_ID|BWS_ACCESS)")
+_NIL_UUID = "00000000-0000-0000-0000-000000000000"
+_BWS_RX = re.compile(r"(?i)bws")
+_TEST_RX = re.compile(r"(^|/)(tests?|fixtures|spec|__tests__)/|(^|/)test_|\.test\.|_test\.")
+_DATA_SUFFIXES = (".json", ".jsonl", ".yaml", ".yml")
 
 MANIFEST = ".bws-secrets.toml"
+# The credential registry lists the consumers of secrets a repo owns, not secrets it consumes.
+REGISTRY = ".cred-consumers.toml"
 EXTERNAL_CONSUMPTION_MODES = frozenset({"coolify-env", "environment-injection"})
 
 
@@ -22,19 +26,36 @@ def _is_doc(rel: str) -> bool:
     return rel.endswith(".md") or rel.startswith("docs/") or "/docs/" in rel
 
 
+def _is_runtime(rel: str) -> bool:
+    """Runtime code: not docs, tests, data files, the manifest or the registry."""
+    return not (
+        rel in (MANIFEST, REGISTRY)
+        or _is_doc(rel)
+        or _TEST_RX.search(rel)
+        or rel.endswith(_DATA_SUFFIXES)
+    )
+
+
 def referenced_uuids(repo_path) -> set[str]:
+    """Every UUID in a runtime file that mentions BWS anywhere.
+
+    Matching by file, not by line, is deliberate. Code rarely puts the UUID on the line that
+    calls `bws`: a launcher assigns it to a variable and passes the variable later, and Python
+    and TypeScript carry it through a helper, a tuple or a map. A non-secret UUID in such a file
+    (a provider's resource id, a BWS project id) is reported too; exempt it by its exact finding
+    in `.security-scan-allow.toml`. The nil UUID is a placeholder and never counts."""
     repo_path = Path(repo_path)
     found: set[str] = set()
     for rel in repo.tracked_files(repo_path):
-        if rel == MANIFEST or _is_doc(rel):
+        if not _is_runtime(rel):
             continue
         try:
             text = (repo_path / rel).read_text(errors="ignore")
         except OSError:
             continue
-        for line in text.splitlines():
-            if _BWS_LINE_RX.search(line):
-                found.update(_UUID_RX.findall(line))
+        if _BWS_RX.search(text):
+            found.update(_UUID_RX.findall(text))
+    found.discard(_NIL_UUID)
     return found
 
 

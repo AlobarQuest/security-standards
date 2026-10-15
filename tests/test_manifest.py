@@ -3,16 +3,33 @@ import tomllib
 from security_scan import manifest
 
 
-def test_referenced_uuids_only_in_bws_context(git_repo):
+def test_referenced_uuids_follows_a_uuid_assigned_away_from_the_bws_call(git_repo):
+    # The launcher shape: the UUID is assigned on one line and the variable reaches `bws` later.
     git_repo.write(
-        "start.sh",
-        'fetch_bws_secret "45eb083f-4b05-4251-924d-b46700e5a643"\n'
-        'UNRELATED_UUID = "11111111-2222-3333-4444-555555555555"\n',
-    )  # not a bws line
+        "scripts/run-lane.sh",
+        'LANE_UUID="${LANE_BWS_UUID:-45eb083f-4b05-4251-924d-b46700e5a643}"\n'
+        'token="$(sds_bws_value "$LANE_UUID")"\n',
+    )
     git_repo.commit()
-    found = manifest.referenced_uuids(git_repo.path)
-    assert "45eb083f-4b05-4251-924d-b46700e5a643" in found
-    assert "11111111-2222-3333-4444-555555555555" not in found
+    assert manifest.referenced_uuids(git_repo.path) == {"45eb083f-4b05-4251-924d-b46700e5a643"}
+
+
+def test_referenced_uuids_ignores_a_file_that_never_mentions_bws(git_repo):
+    git_repo.write("app/ids.py", 'WORK_UNIT_ID = "11111111-2222-3333-4444-555555555555"\n')
+    git_repo.commit()
+    assert manifest.referenced_uuids(git_repo.path) == set()
+
+
+def test_referenced_uuids_skips_tests_data_registry_and_the_nil_uuid(git_repo):
+    line = "bws secret get {}\n"
+    git_repo.write("run.sh", line.format("aaaaaaaa-1111-2222-3333-444444444444"))
+    git_repo.write("tests/test_run.py", line.format("bbbbbbbb-1111-2222-3333-444444444444"))
+    git_repo.write("tasks.json", line.format("cccccccc-1111-2222-3333-444444444444"))
+    git_repo.write("package.yaml", line.format("dddddddd-1111-2222-3333-444444444444"))
+    git_repo.write(".cred-consumers.toml", line.format("eeeeeeee-1111-2222-3333-444444444444"))
+    git_repo.write("example.py", line.format("00000000-0000-0000-0000-000000000000"))
+    git_repo.commit()
+    assert manifest.referenced_uuids(git_repo.path) == {"aaaaaaaa-1111-2222-3333-444444444444"}
 
 
 def test_parse_declared_uuids(git_repo):
