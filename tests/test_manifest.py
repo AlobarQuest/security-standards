@@ -28,8 +28,25 @@ def test_referenced_uuids_skips_tests_data_registry_and_the_nil_uuid(git_repo):
     git_repo.write("package.yaml", line.format("dddddddd-1111-2222-3333-444444444444"))
     git_repo.write(".cred-consumers.toml", line.format("eeeeeeee-1111-2222-3333-444444444444"))
     git_repo.write("example.py", line.format("00000000-0000-0000-0000-000000000000"))
+    git_repo.write("app/main.spec.ts", line.format("ffffffff-1111-2222-3333-444444444444"))
+    git_repo.write(
+        "tools/.cred-consumers.toml", line.format("abababab-1111-2222-3333-444444444444")
+    )
+    git_repo.write(
+        ".bws-secrets.toml", '[[secret]]\nuuid = "cdcdcdcd-1111-2222-3333-444444444444"\n'
+    )
+    git_repo.write("static/app.min.js", 'h="xBwSy";id="efefefef-1111-2222-3333-444444444444"\n')
     git_repo.commit()
     assert manifest.referenced_uuids(git_repo.path) == {"aaaaaaaa-1111-2222-3333-444444444444"}
+
+
+def test_referenced_uuids_counts_a_workflow_that_runs_bws(git_repo):
+    git_repo.write(
+        ".github/workflows/deploy.yml",
+        "      - run: bws secret get 45eb083f-4b05-4251-924d-b46700e5a643\n",
+    )
+    git_repo.commit()
+    assert manifest.referenced_uuids(git_repo.path) == {"45eb083f-4b05-4251-924d-b46700e5a643"}
 
 
 def test_parse_declared_uuids(git_repo):

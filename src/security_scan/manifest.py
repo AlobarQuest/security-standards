@@ -8,8 +8,13 @@ from security_scan import repo
 _UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 _UUID_RX = re.compile(_UUID)
 _NIL_UUID = "00000000-0000-0000-0000-000000000000"
-_BWS_RX = re.compile(r"(?i)bws")
-_TEST_RX = re.compile(r"(^|/)(tests?|fixtures|spec|__tests__)/|(^|/)test_|\.test\.|_test\.")
+# "bws" with a non-alphanumeric on at least one side: `bws`, `_bws_get`, `BWS_ACCESS`, but not
+# a run inside a base64 blob or a lockfile hash.
+_BWS_RX = re.compile(r"(?i)(?<![a-z0-9])bws|bws(?![a-z0-9])")
+_TEST_RX = re.compile(
+    r"(^|/)(tests?|fixtures|spec|__tests__)/|(^|/)(test_|conftest\.py$)|[._](test|spec)\."
+)
+# Data files, except workflow YAML under `.github/`, which runs `bws` itself.
 _DATA_SUFFIXES = (".json", ".jsonl", ".yaml", ".yml")
 
 MANIFEST = ".bws-secrets.toml"
@@ -29,10 +34,10 @@ def _is_doc(rel: str) -> bool:
 def _is_runtime(rel: str) -> bool:
     """Runtime code: not docs, tests, data files, the manifest or the registry."""
     return not (
-        rel in (MANIFEST, REGISTRY)
+        Path(rel).name in (MANIFEST, REGISTRY)
         or _is_doc(rel)
         or _TEST_RX.search(rel)
-        or rel.endswith(_DATA_SUFFIXES)
+        or (rel.endswith(_DATA_SUFFIXES) and not rel.startswith(".github/"))
     )
 
 
