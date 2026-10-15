@@ -196,3 +196,36 @@ def test_gitignore_rule_fires_when_repo_uses_bws(git_repo, tmp_path, monkeypatch
     report, code = cli.scan(repo_path=git_repo.path, cache_path=cache, category="security")
     assert code == 1
     assert any(f["rule_id"] == "bws.secret-files-gitignored" for f in report["findings"])
+
+
+def test_manifest_drift_is_one_finding_per_uuid(git_repo, tmp_path, monkeypatch):
+    monkeypatch.delenv("INFRABRAIN_BASE_URL", raising=False)
+    git_repo.write(
+        "scripts/ops.sh",
+        "DOMAIN_ID=11111111-2222-3333-4444-555555555555\n"
+        'key="$(bws_get 45eb083f-4b05-4251-924d-b46700e5a643)"\n',
+    )
+    git_repo.write(
+        ".security-scan-allow.toml",
+        '[[allow]]\nrule = "bws.manifest-matches-usage"\nfile = ".bws-secrets.toml"\n'
+        'evidence = "undeclared UUID in code: 11111111-2222-3333-4444-555555555555"\n'
+        'reason = "A provider resource id, not a BWS secret."\n',
+    )
+    git_repo.commit()
+    cache = _cache(
+        tmp_path,
+        [
+            {
+                "id": "bws.manifest-matches-usage",
+                "severity": "WARN",
+                "check": {"kind": "manifest_matches_usage"},
+                "remediation": "sync",
+                "reason": "honest",
+            }
+        ],
+    )
+    report, _ = cli.scan(repo_path=git_repo.path, cache_path=cache, category="security")
+    assert [f["evidence"] for f in report["findings"]] == [
+        "undeclared UUID in code: 45eb083f-4b05-4251-924d-b46700e5a643"
+    ]
+    assert report["meta"]["allowlisted"] == 1

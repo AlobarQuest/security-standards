@@ -32,7 +32,7 @@
   {"id": "bws.manifest-matches-usage", "severity": "WARN",
    "reason": "The manifest must match reality or it rots into fiction.",
    "check": {"kind": "manifest_matches_usage"},
-   "remediation": "Add undeclared UUIDs to the manifest; remove stale entries."},
+   "remediation": "Add undeclared UUIDs to the manifest; remove stale entries. Exempt a UUID that is not a BWS secret by its exact finding in .security-scan-allow.toml."},
 
   {"id": "bws.least-privilege-scope", "severity": "INFO",
    "reason": "A workload's machine-account should be scoped to only the projects its secrets need.",

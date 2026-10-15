@@ -33,10 +33,9 @@ def _manifest_findings(rule, repo_path) -> list[Finding]:
         if uses_bws and not d.manifest_exists:
             out.append(mk("repo references BWS secrets but has no .bws-secrets.toml"))
     elif kind == "manifest_matches_usage":
-        if d.undeclared:
-            out.append(mk(f"undeclared UUIDs in code: {sorted(d.undeclared)}"))
-        if d.stale:
-            out.append(mk(f"stale manifest entries (unused): {sorted(d.stale)}"))
+        # One finding per UUID, so `.security-scan-allow.toml` can exempt a single UUID.
+        out += [mk(f"undeclared UUID in code: {u}") for u in sorted(d.undeclared)]
+        out += [mk(f"stale manifest entry (unused): {u}") for u in sorted(d.stale)]
     return out
 
 
