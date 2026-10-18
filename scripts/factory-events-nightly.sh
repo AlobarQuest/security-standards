@@ -2,8 +2,10 @@
 # factory-events nightly: adapt -> verify (incl. anchor) -> ship -> healthcheck ping.
 # Source of truth: ~/Projects/security-standards/scripts/factory-events-nightly.sh (deployed → ~/.claude/bin/factory-events-nightly.sh)
 # Edit here, not in place; then: cd ~/Projects/security-standards && make install
-# Config: ~/.factory/env (chmod 600) — CM_BASE_URL, CM_M2M_TOKEN, FACTORY_DB_DSN,
-# FACTORY_HC_PING_URL (optional; ping skipped when unset).
+# Config: ~/.factory/env (chmod 600) — CM_BASE_URL, FACTORY_DB_DSN, FACTORY_HC_PING_URL
+# (optional; ping skipped when unset). CM_M2M_TOKEN is fetched from BWS on every run, never kept
+# in that file: the executor rotates it (orchestrator ADR-0055 amendment 9, "The change-manager
+# adapter"), and a copy would keep the old value after the rotation retired it.
 set -euo pipefail
 
 REPO="$HOME/Projects/security-standards"
@@ -91,6 +93,26 @@ set +a
 [ -x "$PY" ] || fail "missing venv: $PY (run: python3 -m venv .venv-events && pip install -e '.[events]')"
 
 hc_ping "/start"
+
+# FETCHED AFTER `/start` AND FATAL WHEN EMPTY, both deliberately. The rotation executor counts this
+# job as switched to a new change-manager bearer once its check shows a successful run that
+# started after the keeper was written, so the fetch must fall inside the run Healthchecks times,
+# and an empty value must reach `/fail` rather than a success. The broad account reads the
+# keeper, as for every other reader of it; `--color no` because FORCE_COLOR wraps the JSON.
+STAGE="credential"
+CM_KEEPER_ID="${FACTORY_CM_SECRET_ID:-af0e4192-edc6-46ae-9e4f-b469011dbb8d}"
+CM_IDENTITY="${BWS_ACCESS_TOKEN_BROAD:-$(/usr/bin/security find-generic-password \
+    -s 'Claude' -a 'BWS_ACCESS_TOKEN_VPS_BACKUP' -w 2>/dev/null || true)}"
+[ -n "$CM_IDENTITY" ] || fail "no BWS identity for the change-manager credential (Keychain Claude)"
+BWS_BIN="$(command -v bws 2>/dev/null || true)"
+if [ -z "$BWS_BIN" ] && [ -x /usr/local/bin/bws ]; then BWS_BIN="/usr/local/bin/bws"; fi
+[ -n "$BWS_BIN" ] || fail "bws is neither on PATH nor at /usr/local/bin/bws"
+CM_M2M_TOKEN="$(BWS_ACCESS_TOKEN="$CM_IDENTITY" env -u FORCE_COLOR -u CLICOLOR_FORCE \
+    "$BWS_BIN" secret get "$CM_KEEPER_ID" --output json --color no 2>/dev/null \
+    | python3 -c 'import sys,json; print(json.load(sys.stdin)["value"])' 2>/dev/null || true)"
+unset CM_IDENTITY
+[ -n "$CM_M2M_TOKEN" ] || fail "could not read the change-manager credential from BWS"
+export CM_M2M_TOKEN
 
 # Each stage's own output is the only source of the facts below: nothing here decides a status
 # the tools did not report.
