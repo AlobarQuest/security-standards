@@ -43,9 +43,14 @@ authority model (ability / policy / task-authority / approval).
 ## Runtime config — `~/.factory/env` (chmod 600, never tracked)
 
     CM_BASE_URL=https://change-mgr.alobar.net
-    CM_M2M_TOKEN=<from BWS — see .bws-secrets.toml>
     FACTORY_DB_DSN=postgresql://factory_events:<from BWS>@127.0.0.1:5545/factory_events
     FACTORY_HC_PING_URL=<healthchecks.io ping url>  # optional
+
+`CM_M2M_TOKEN` isn't in this file. `scripts/factory-events-nightly.sh` fetches it from BWS
+(`change-manager/M2M_TOKEN`, see `.bws-secrets.toml`) with the broad account on every run, and
+fails the run when the fetch comes back empty. The rotation executor rotates that bearer, so a
+copy here would keep the old value after the rotation retired it. To run `adapt` by hand, export
+it in that shell from BWS first.
 
 ## Recovery
 
