@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 
 import security_scan
 from security_scan.read_guard import selfcheck
@@ -93,12 +94,18 @@ def _make_shim(tmp_path, body):
     return str(s)
 
 
-def test_canary_ok_with_working_shim(tmp_path):
-    shim = _make_shim(
+def _hook_shim(tmp_path):
+    # The interpreter running the tests, never a bare `python3`: PATH's may be older than the
+    # package needs, and then the hook dies on import and every canary reads as a missing deny.
+    return _make_shim(
         tmp_path,
         f'#!/usr/bin/env bash\nexec /usr/bin/env PYTHONPATH="{_src_dir()}" '
-        f"python3 -m security_scan.read_guard.hook\n",
+        f'"{sys.executable}" -m security_scan.read_guard.hook\n',
     )
+
+
+def test_canary_ok_with_working_shim(tmp_path):
+    shim = _hook_shim(tmp_path)
     r = selfcheck.check_canary(shim)
     assert r.ok is True, r.detail
 
@@ -119,11 +126,7 @@ def test_canary_does_not_pollute_real_audit_log(tmp_path, monkeypatch):
     # point the REAL default at a path that must stay empty; canary must use its own temp override
     sentinel = tmp_path / "real-audit.jsonl"
     monkeypatch.setenv("READ_GUARD_AUDIT_LOG", str(sentinel))
-    shim = _make_shim(
-        tmp_path,
-        f'#!/usr/bin/env bash\nexec /usr/bin/env PYTHONPATH="{_src_dir()}" '
-        f"python3 -m security_scan.read_guard.hook\n",
-    )
+    shim = _hook_shim(tmp_path)
     selfcheck.check_canary(shim)
     # the canary sets its OWN READ_GUARD_AUDIT_LOG for the subprocess, so the sentinel stays absent
     assert not sentinel.exists()
