@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: rotation-executor-keychain
+version: 1
+status: active
+runtime: node-executor
+operator: devon
+environment: mini
+description: The credential-rotation executor's second instance (orchestrator ADR-0055 amendment 12), the same deterministic, no-LLM program as rotation-executor, running on the operator machine itself because the credentials it rotates, BWS machine access tokens, live in that machine's Keychain. It pulls approved rotation units with its own WORKER bearer, held in Keychain, and the orchestrator confines claims both ways - only this identity may claim a unit of the BWS-token adapter, and it may claim nothing else.
+authority_profile: rotation-executor-keychain-v1
+capabilities: []
+prohibited: []
