@@ -1,0 +1,39 @@
+schema: authority-profile/v1
+profile: rotation-executor-keychain-v1
+description: >-
+  The credential-rotation executor's Keychain instance (orchestrator ADR-0055 amendment 12). It
+  claims only units of the BWS-token adapter and does their machine steps: prove the new token,
+  switch every Keychain item that held the old one, verify the readers, and prove the old token
+  dead. Each capability traces to an amendment 12 line: task_claim and event_emit to decision 2
+  (it claims units and files evidence); repository_read to decision 6 (it checks the revision
+  against intent-packages' git and reads the registry); secret_read and secret_write to decisions
+  1 and 4 (it reads and writes the Keychain items it rotates and its own state items);
+  data_delete to decision 1 (the quarantine and staging items are deleted after confirm-dead);
+  infra_mutation to decision 1's consumer verification (it restarts a long-running holder on this
+  machine so the holder loads the new value). credential_create and credential_revoke are
+  prohibited: Bitwarden offers no machine path to create or revoke an access token, so a person
+  does both in the web app.
+capabilities:
+  - task_claim
+  - event_emit
+  - repository_read
+  - secret_read
+  - secret_write
+  - data_delete
+  - infra_mutation
+prohibited:
+  - credential_create
+  - credential_revoke
+  - repository_write
+  - test_execution
+  - pr_open
+  - merge_to_main
+  - drift_detection
+  - change_filing
+  - change_approval
+  - email_send
+  - outward_publish
+  - spend_money
+  - calendar_write
+  - third_party_contact
+  - external_system_write
