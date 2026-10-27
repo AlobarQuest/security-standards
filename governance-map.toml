@@ -227,6 +227,12 @@ path = "~/Projects/intent-packages"
 class = "consumer"
 uses_bws = true
 
+[[repo]]
+name = "project-standards"
+path = "~/Projects/project-standards"
+class = "consumer"
+uses_bws = true
+
 # ───────────────────── Runtime state (deliberately repo-less) ─────────────────────
 [[runtime_dir]]
 path = "~/.config/infra-drift"
