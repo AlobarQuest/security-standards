@@ -1,11 +1,11 @@
 schema: agent-identity/v1
 agent_id: security-executor
 version: 1
-status: active
+status: retired
 runtime: node-executor
 operator: devon
 environment: mini
-description: The no-LLM, plan-hash-gated executor for approved security changes (WS-0.7 credential-rotation lane), sharing the 4AM window process with change-window-agent.
+description: Retired 2026-11-01 with the 04:00 security window (orchestrator ADR-0055). Kept so its recorded events still resolve. The no-LLM, plan-hash-gated executor for approved security changes.
 authority_profile: security-window-v1
 capabilities: []
 prohibited: []
