@@ -6,8 +6,7 @@ description: >-
   event_emit traces to that item (it appends the observation row and its event). Its authority
   equals observer-v1's, and its prohibited list is observer-v1's whole list. It is a distinct
   profile so that the orchestrator's boot check (mirroring _require_rotation_executors) can name
-  it: boot refuses a credential holding this profile that the work-carrier setting doesn't name,
-  and a setting naming an agent no credential holds.
+  it.
 capabilities:
   - event_emit
 prohibited:
