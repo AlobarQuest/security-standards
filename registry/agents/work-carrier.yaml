@@ -1,0 +1,11 @@
+schema: agent-identity/v1
+agent_id: work-carrier
+version: 1
+status: active
+runtime: node-executor
+operator: devon
+environment: any
+description: The work carrier (orchestrator work_carrier) as an observer. Under this identity and an OBSERVER-only M2M credential (key id work-carrier-observer), it records one observation per standing-approval check before an intake (orchestrator ADR-0055 amendment 22 item 3), and nothing else. Its intakes keep the shared orchestrator-system SYSTEM credential, unchanged. The orchestrator's decomposition gate trusts that observation only when recorded_by is this agent id, so no other caller may hold it. It runs on the operator machine and moves to a container in ADR-0059 increment 4, hence environment any.
+authority_profile: work-carrier-observer-v1
+capabilities: []
+prohibited: []
