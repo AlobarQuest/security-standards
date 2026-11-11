@@ -4,7 +4,7 @@ Outcome: done
 
 - PR: [AlobarQuest/security-standards#86](https://github.com/AlobarQuest/security-standards/pull/86), ready, not merged.
 - Branch: `hq/work-carrier-identity-registry`. Base: `origin/main` at `4987197` (confirmed at dispatch).
-- Registry commit: `9420aa5`. This report is committed on top of it, so the PR head is the report commit.
+- Registry commits: `9420aa5` (both files) and `3fa7638` (the profile description cut to what exists, after review). The report is committed on top, so the PR head is the report commit.
 
 ## What I built
 
@@ -23,6 +23,7 @@ I added two registry files, modelled on PR #79 (`64b7186`):
   `capabilities: [event_emit]`, and a `prohibited` list identical to `observer-v1`'s 14 terms. The
   description traces `event_emit` to amendment 22 item 3. It also says why this is a distinct profile: the
   orchestrator's boot check (3e-cid-2, mirroring `_require_rotation_executors`) has to be able to name it.
+  It doesn't describe that unbuilt check's behavior.
 
 No schema, vocabulary, CLI, or test change was needed. I created no credential and took no BWS,
 Coolify, or orchestrator action.
@@ -31,7 +32,8 @@ Coolify, or orchestrator action.
 
 ### 1. Validate, show, and authority
 
-Run with the worktree's own `.venv` (Python 3.14.3, made with `uv venv --clear --python 3.14`):
+Run with the worktree's own `.venv` (Python 3.14.3, made with `uv venv --clear --python 3.14`), at
+`9420aa5` and again at `3fa7638` with the same output:
 
 - `PYTHONPATH=src .venv/bin/python -m agent_registry validate` → `registry ok: 19 agents, 15 profiles`, rc 0.
 - `show work-carrier` prints the agent file as written.
@@ -54,10 +56,13 @@ blocks shows they're identical to `observer-v1`'s list.
 
 ### 4. Tests and the CI registry step
 
-- `make test` in both venvs. Each run: **206 passed, 5 deselected**.
-  - `.venv` with `.[dev]`.
-  - `.venv-events` with `.[events,dev]`, the second venv the repo's `CLAUDE.md` names.
-- The base (`git archive origin/main`, the same interpreter) also collects 206 passed, 5 deselected, so the test count didn't change.
+Every run reported **206 passed, 5 deselected**:
+
+- `.venv/bin/python -m pytest -q` (`.venv` has `.[dev]`).
+- `PYTHONPATH=src .venv-events/bin/python -m pytest -q` (`.venv-events` has `.[events,dev]`, the second venv the repo's `CLAUDE.md` names).
+- `make test PYBIN=.venv-events/bin/python`.
+- `make check` at `3fa7638`: ruff check ("All checks passed!"), ruff format ("58 files already formatted"), pyright ("0 errors"), and pytest (211 collected, 5 deselected, 206 selected and passed). rc 0.
+- The base (`git archive origin/main`, run with `.venv/bin/python -m pytest -q`) also gives 206 passed, 5 deselected, so the test count didn't change.
 - CI registry step (`.github/workflows/security-scan.yml`: `python -m agent_registry validate` after
   `pip install -e ".[dev]"`): `.venv/bin/python -m agent_registry validate` on the editable install
   → `registry ok: 19 agents, 15 profiles`, rc 0.
@@ -68,58 +73,73 @@ blocks shows they're identical to `observer-v1`'s list.
   - The bundle builds with 19 actors, including
     `{'agent_id': 'work-carrier', 'version': 1, 'status': 'active', 'runtime': 'node-executor', 'authority_profile': 'work-carrier-observer-v1'}`.
     The artifact digest at `9420aa5` is `d5e37d6a…f633`. It's an illustration only: the digest covers
-    `SOURCE_REVISION`, so the merge commit gives a different one.
+    `SOURCE_REVISION`, so the merge commit gives a different one. `3fa7638` changed only a profile,
+    and profiles aren't in the shaped context, so the bundle's content is the same.
 
 ### 5. What the orchestrator needs next (3e-cid-2)
 
-The handoff's description of the pin is slightly off. The orchestrator `Dockerfile` takes
-`SECURITY_STANDARDS_REVISION` and `REGISTRY_ARTIFACT_SHA256` as build args, but the production
-values live in one file, **`security-standards.pin.toml`** (`revision`, `artifact_sha256`). The
-release workflow (`.github/workflows/release-image.yml` ~93-193) reads that file and passes the values on.
-`tests/fixtures/` holds a *synthetic* registry: `tests/fixtures/security-standards/` with a
-placeholder revision `0123…4567`, `tests/fixtures/registry-bundle.json`, and quality.yml's fixed
-digest `258e47…fbce`. That fixture isn't a production pin. Neither fact is wrong enough to block this
-step, so I went ahead.
+The pin facts in the handoff check out. The orchestrator `Dockerfile` takes
+`SECURITY_STANDARDS_REVISION` and `REGISTRY_ARTIFACT_SHA256` as build args (lines 4-5, 18-19), and
+`tests/fixtures/` holds a registry fixture. One addition: the production values live in
+**`security-standards.pin.toml`** (`revision = 64b7186…`, `artifact_sha256`). The release workflow
+(`.github/workflows/release-image.yml` ~93-193) reads that file and passes both values to the build.
+The `tests/fixtures/` registry is synthetic: placeholder revision `0123…4567`, agents `devon` and
+`worker` only, and quality.yml's fixed digest `258e47…fbce`. It isn't a production pin.
 
 In order:
 
-1. Bump `security-standards.pin.toml` to this PR's **merge commit** and recompute
+1. Bump `security-standards.pin.toml` to this PR's **merge commit**, and recompute
    `artifact_sha256` with `scripts/shape_registry_context.py` and then `build_registry_bundle.py`'s
    `artifact_digest`, as the file's header says. Then rebuild and redeploy the image. `agent_id`
    resolves against the bundle baked into the image.
-2. The pin is at `64b7186` (PR #79), behind PR #83, which retired `security-executor`. So this
-   bump also drops `security-executor` from the bundle. `git grep security-executor` over orchestrator
-   `src`, `scripts`, and `*.toml` returns nothing, but confirm that no live credential still names it, or boot
-   resolution fails for that credential.
-3. Add the boot check: a `WORK_CARRIER_PROFILE = "work-carrier-observer-v1"` entry checked like
-   `_require_rotation_executors` (`src/orchestrator/main.py` 226-250, called at ~135) against
-   `ORCHESTRATOR_WORK_CARRIER_AGENT_ID`. If its tests resolve the agent, add `work-carrier` to the
-   synthetic fixture (`tests/fixtures/security-standards/agents/`, `registry-bundle.json`, and
-   quality.yml's fixture digest), as `tests/identity/test_rotation_executor_boot.py` does for the executors.
+2. The bump carries more than this agent. `git diff --stat 64b7186..origin/main` over the four
+   shaped paths (`registry/agents`, `src/agent_registry`, `src/factory_events`, `schema`) shows one
+   other change: `registry/agents/security-executor.yaml` (PR #83, `25ffc84`), whose `status` goes
+   from `active` to `retired`. The entry stays in the bundle. `git grep security-executor` over
+   orchestrator `src`, `scripts`, and `*.toml` returns nothing, but confirm that no live M2M credential
+   names `security-executor`, because the bundled actor becomes `retired`.
+3. Add the boot check, keyed on `authority_profile == "work-carrier-observer-v1"` and
+   `ORCHESTRATOR_WORK_CARRIER_AGENT_ID`, mirroring `_require_rotation_executors`
+   (`src/orchestrator/main.py` 230-250, called at ~135). Its tests don't need a fixture-file change:
+   `tests/identity/test_rotation_executor_boot.py` (lines 21-42) loads
+   `tests/fixtures/registry-bundle.json` and appends the executor actors in the test, and a
+   work-carrier test can do the same.
 4. The image ships only `registry/agents`, `src/agent_registry`, `src/factory_events`, and `schema`
-   (`shape_registry_context._MAP`, `Dockerfile` 42-44). Profiles aren't in the image. The boot check
-   compares the agent's `authority_profile` *string*, so that's enough; it never reads the profile's capabilities.
+   (`shape_registry_context._MAP`, `Dockerfile` 42-44). Profiles aren't in the image. The bundle
+   carries the agent's `authority_profile` *string*, which is what a boot check compares.
 
-Other orchestrator reads of this repository:
+Other orchestrator reads of this repository, none of which this step needs to change:
 
-- `package_sources.py` 180-230 reads `registry/agents/<id>.yaml` and `factory_events` through `SECURITY_STANDARDS_DIR`.
+- `package_sources.py` (175-235) reads `registry/agents/<id>.yaml` only to check for
+  `human-operator-v1` (`_is_human_operator`), and `src` for the factory-events chain. It uses
+  `SECURITY_STANDARDS_DIR`, falling back to `~/Projects/security-standards`, the main checkout.
+  A host-side caller without that variable reads the main checkout, which updates only when someone
+  syncs `main` there. Nothing in this step reads `work-carrier` through that path.
 - `scripts/run-bump-driver.sh` puts this repository's `src` on `PYTHONPATH`.
 - `.cred-consumers.toml` names this repository twice.
 
-None of these needs a change for this step. The credential deployment order and the
-`.cred-consumers.toml` row for `work-carrier-observer` are in the increment 3 report's identity
-design (items 5-7) and are Devon's.
+The credential deployment order and the `.cred-consumers.toml` row for `work-carrier-observer` are
+in the increment 3 report's identity design (items 5-7) and are Devon's.
 
 ### Security scan and code review
 
-- Security scan from the worktree root, run as the handoff gives it: **BLOCK 0**, WARN 4, INFO 1, rc 0.
-  All the findings and allowlisted entries are in files this diff doesn't touch.
-- `/code-review` (low) on `origin/main...HEAD`: no findings.
+- Security scan from the worktree root, run as the handoff gives it, at `9420aa5`: **BLOCK 0**,
+  WARN 4, INFO 1, rc 0. All the findings and allowlisted entries are in files this diff doesn't
+  touch. A control run on a `git archive` copy of the base returned rc 1. That copy has no `.git`,
+  which the scanner's history rules expect, so I didn't treat it as a comparison. The rerun at the PR head is under "Final checks".
+- `/code-review` (low) on `origin/main...HEAD` at `9420aa5`: the skill returned `(none)`.
+
+### Final checks
+
+Run at `3fa7638`, with the revised report in the working tree:
+
+- Security scan: BLOCK 0, WARN 4, INFO 1, rc 0, the same findings as before.
+- `make check`: rc 0. Check 4 lists its results.
 
 ## Files changed
 
 - `registry/agents/work-carrier.yaml` (new, 11 lines)
-- `registry/profiles/work-carrier-observer-v1.yaml` (new, 27 lines)
+- `registry/profiles/work-carrier-observer-v1.yaml` (new, 26 lines)
 - `docs/superpowers/reports/work-carrier-identity-registry-report.md` (this report)
 
 ## Self-review
@@ -130,13 +150,11 @@ design (items 5-7) and are Devon's.
 
 ## Deviations
 
-None from the build itself. The handoff described the orchestrator's pin as living in the Dockerfile
-and `tests/fixtures/`. The production pin is in `security-standards.pin.toml`, and the fixture is
-synthetic. Check 5 has the details.
+None.
 
 ## Concerns and follow-ups
 
-- 3e-cid-2 (orchestrator): the pin bump (it also drops `security-executor`), the image rebuild, and the boot check, as listed in check 5.
+- 3e-cid-2 (orchestrator): the pin bump (it also carries `security-executor` to `retired`), the image rebuild, and the boot check, as listed in check 5.
 - The worktree's `.venv` and `.venv-events` are gitignored local environments, not committed.
 
 ## Standards followed
