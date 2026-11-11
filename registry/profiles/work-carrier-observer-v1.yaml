@@ -1,0 +1,26 @@
+schema: authority-profile/v1
+profile: work-carrier-observer-v1
+description: >-
+  The work carrier's standing-approval observer (orchestrator ADR-0055 amendment 22 item 3). It
+  records one observation per standing-approval check before an intake, and does nothing else;
+  event_emit traces to that item (it appends the observation row and its event). Its authority
+  equals observer-v1's, and its prohibited list is observer-v1's whole list. It is a distinct
+  profile so that the orchestrator's boot check (mirroring _require_rotation_executors) can name
+  it.
+capabilities:
+  - event_emit
+prohibited:
+  - repository_write
+  - pr_open
+  - merge_to_main
+  - infra_mutation
+  - change_filing
+  - change_approval
+  - secret_write
+  - credential_create
+  - credential_revoke
+  - email_send
+  - task_claim
+  - outward_publish
+  - external_system_write
+  - data_delete
