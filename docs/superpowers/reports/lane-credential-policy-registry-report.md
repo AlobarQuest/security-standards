@@ -1,4 +1,6 @@
-Outcome: done
+Outcome: blocked
+
+I'm blocked on one wording question, not on a failing check: see `lane-credential-policy-registry-question.md`. Every check passes, and the PR is open and ready.
 
 # Report: the `lane-credential-policy` registry label (plan step 3e-a22-4a)
 
@@ -90,6 +92,14 @@ Every run reported **211 collected, 5 deselected, 206 passed**:
   `source.ref`, and the evidence's hash, revision, approver, and commit. Neither reads the event's
   `actor`. The approver they match is the `policy:<profile>@v<N>` string (`work_carrier/standing.py`
   docstring).
+- On read, the orchestrator doesn't check the actor against the registry.
+  `package_sources._verify_factory_chain` runs `python -m factory_events verify` with the
+  security-standards checkout's `src` (`$SECURITY_STANDARDS_DIR` or `~/Projects/security-standards`),
+  not the bundle. In this repo, `store.verify_chain` and `store.append` call only `validate_event`,
+  which checks the JSON Schema. Only `make_event` calls `_assert_registered_actor`
+  (`envelope.py:87`), so the actor is checked once, at emit.
+- `_is_human_operator` reads agent YAML from the same checkout's `registry/`, not the bundle, and
+  it's only reached for a human approver.
 - So no orchestrator change is needed for the event to work. A pin bump to the merge commit is
   optional and only keeps the bundle current. If someone does it, they bump both values together and
   recompute the digest with `scripts/shape_registry_context.py`, then `build_registry_bundle.py`, as
@@ -110,8 +120,8 @@ Every run reported **211 collected, 5 deselected, 206 passed**:
 - Before an event naming this actor is accepted, the checkout the emitter resolves must contain this
   file. With the default, that's the main checkout `~/Projects/security-standards`, which needs a
   `git sync` to a `main` that includes this merge. No venv reinstall is needed, because the `src`
-  prefix wins over any installed copy. The deployed hooks aren't involved, so this doesn't need
-  `make install`.
+  prefix wins over any installed copy. `governance-map.toml` has no `factory_events` or `registry`
+  entry (a `grep` returns nothing), so `make install` deploys neither, and this needs no `make install`.
 - The emitter takes the actor from `FACTORY_AGENT_ID`, and its default is `claude-code-interactive`.
   So the HQ cycle that records the approval must set `FACTORY_AGENT_ID=lane-credential-policy` for
   that one `approve` call. Otherwise the event is attributed to the default actor.
@@ -135,6 +145,7 @@ from the worktree root, rc 0. Summary: **BLOCK 0, WARN 4, INFO 1**, with 12 allo
 
 - `registry/agents/lane-credential-policy.yaml` (new)
 - `docs/superpowers/reports/lane-credential-policy-registry-report.md` (new; this report)
+- `docs/superpowers/reports/lane-credential-policy-registry-question.md` (new; the wording question)
 
 ## Self-review and deviations
 
@@ -144,9 +155,10 @@ from the worktree root, rc 0. Summary: **BLOCK 0, WARN 4, INFO 1**, with 12 allo
   a shape no agent id can take. The orchestrator matches the approval on that string, not on the
   actor. So I wrote that the id is the `actor`, beside the `policy:` approver in the evidence. I also
   opened the description with "The actor recorded" instead of the handoff's "the approver recorded",
-  for the same reason. `ebfc165` makes that correction. I read the handoff's phrase as loose wording,
-  not as a contrary fact, so I didn't stop to ask. If HQ meant this id to also be the approver string,
-  that conflicts with ADR-0028's `POLICY_APPROVER_RE`, and the question goes to intent-packages.
+  for the same reason. `ebfc165` makes that correction. A `none-v1` id also can't be a recognized
+  ledger approver: `_is_recognised_approver` accepts only `human-operator-v1` or a `policy:` string.
+  The handoff says to stop when a fact is wrong at its source, so I asked HQ to confirm the wording.
+  The question file lists the options; option B reverts `ebfc165`.
 - **The description is longer than `deploy-policy`'s and stays inside the brief.** It doesn't
   describe any unbuilt behavior. "Reissues need Devon by name" is the handoff's statement of the
   standing answer's scope, and I didn't verify it against the proposer code.
