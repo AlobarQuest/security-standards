@@ -1,6 +1,6 @@
-Outcome: blocked
+Outcome: done
 
-I'm blocked on one wording question, not on a failing check: see `lane-credential-policy-registry-question.md`. Every check passes, and the PR is open and ready.
+HQ answered the wording question with option A: keep the PR's wording (`ebfc165`). The question and answer are in `lane-credential-policy-registry-question-answered.md`.
 
 # Report: the `lane-credential-policy` registry label (plan step 3e-a22-4a)
 
@@ -145,7 +145,7 @@ from the worktree root, rc 0. Summary: **BLOCK 0, WARN 4, INFO 1**, with 12 allo
 
 - `registry/agents/lane-credential-policy.yaml` (new)
 - `docs/superpowers/reports/lane-credential-policy-registry-report.md` (new; this report)
-- `docs/superpowers/reports/lane-credential-policy-registry-question.md` (new; the wording question)
+- `docs/superpowers/reports/lane-credential-policy-registry-question-answered.md` (new; the wording question and HQ's answer, renamed by HQ)
 
 ## Self-review and deviations
 
@@ -157,8 +157,9 @@ from the worktree root, rc 0. Summary: **BLOCK 0, WARN 4, INFO 1**, with 12 allo
   opened the description with "The actor recorded" instead of the handoff's "the approver recorded",
   for the same reason. `ebfc165` makes that correction. A `none-v1` id also can't be a recognized
   ledger approver: `_is_recognised_approver` accepts only `human-operator-v1` or a `policy:` string.
-  The handoff says to stop when a fact is wrong at its source, so I asked HQ to confirm the wording.
-  The question file lists the options; option B reverts `ebfc165`.
+  The handoff says to stop when a fact is wrong at its source, so I asked HQ. HQ chose option A:
+  the handoff's "approver" wording was HQ's misstatement, D-38 named only the event actor, and the
+  ledger approver stays the computed `policy:<profile>@v<N>` string. `ebfc165` stays.
 - **The description is longer than `deploy-policy`'s and stays inside the brief.** It doesn't
   describe any unbuilt behavior. "Reissues need Devon by name" is the handoff's statement of the
   standing answer's scope, and I didn't verify it against the proposer code.
