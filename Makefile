@@ -96,9 +96,8 @@ fix:
 
 .PHONY: install verify ownership strip-stanzas test check-integration
 
-check-integration:
-	@if [ -z "$$FACTORY_TEST_DSN" ]; then echo "FACTORY_TEST_DSN is required for check-integration"; exit 2; fi
-	$(PY) -m pytest -q -m integration
+check-integration:  ## integration tests against FACTORY_TEST_DSN, or a throwaway Postgres container
+	@PYBIN="$(PYBIN)" scripts/check-integration.sh
 
 install:  ## deploy artifacts, reconcile control-plane, regenerate OWNERSHIP.md, then verify
 	$(PY) -m security_scan.governance deploy

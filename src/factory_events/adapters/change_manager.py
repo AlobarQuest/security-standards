@@ -15,7 +15,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from factory_events import store
+from factory_events import chain, store
 from factory_events.envelope import deterministic_event_id, make_event
 
 SYSTEM = "change-manager"
@@ -164,7 +164,7 @@ def adapt(fetch: Callable[[int, int], list[dict]] | None = None) -> int:
         fetch = _http_fetch
     mark = _load_watermark()
     after_id = mark["last_id"] if mark else 0
-    known = store.event_ids()
+    known = chain.event_ids()
     appended = 0
     while True:
         page = fetch(after_id, PAGE_LIMIT)
@@ -173,7 +173,7 @@ def adapt(fetch: Callable[[int, int], list[dict]] | None = None) -> int:
         for raw in page:
             event = _map_event(raw)
             if event["event_id"] not in known:
-                store.append_event(event)
+                chain.append_event(event)
                 known.add(event["event_id"])
                 appended += 1
         last_id = page[-1]["id"]

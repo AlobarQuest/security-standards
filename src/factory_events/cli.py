@@ -1,11 +1,17 @@
-"""factory-events CLI: emit, verify, adapt, ship."""
+"""factory-events CLI: emit, verify, adapt, ship, import-file.
+
+emit, verify and adapt use the database chain when FACTORY_EVENTS_APPEND_DSN or
+FACTORY_EVENTS_READ_DSN is set (chain.py), and the file chain when neither is.
+"""
 
 import argparse
 import json
 import sys
 from datetime import UTC, datetime
+from pathlib import Path
 
-from factory_events import store
+from factory_events import chain, db, store
+from factory_events.db import ChainError
 from factory_events.envelope import EnvelopeError, make_event
 
 
@@ -29,13 +35,25 @@ def _cmd_emit(args: argparse.Namespace) -> int:
     except (EnvelopeError, json.JSONDecodeError) as exc:
         print(f"emit failed: {exc}", file=sys.stderr)
         return 1
-    record = store.append_event(event)
+    try:
+        record = chain.append_event(event)
+    except ChainError as exc:
+        print(f"emit failed: {exc}", file=sys.stderr)
+        return 1
+    # The bare id is stdout's last line, after any JSON log record, all of which carry this
+    # same id: intent-packages' _parse_event_id reads either.
     print(event["event_id"])
     print(f"seq={record['seq']} head={record['hash']}", file=sys.stderr)
     return 0
 
 
 def _cmd_verify(args: argparse.Namespace) -> int:
+    dsn = chain.verify_dsn()
+    if dsn:
+        return _verify_database(dsn, args)
+    if getattr(args, "record_anchor", False):
+        print("VERIFY FAIL: --record-anchor needs the database chain", file=sys.stderr)
+        return 1
     tolerate_torn_tail = getattr(args, "tolerate_torn_tail", False)
     errors = store.verify_chain(tolerate_torn_tail=tolerate_torn_tail)
     if errors:
@@ -58,14 +76,52 @@ def _cmd_verify(args: argparse.Namespace) -> int:
                 )
                 return 1
             print(f"anchor ok: seq {anchor[0]} present")
+    _print_chain_ok(current)
+    return 0
+
+
+def _print_chain_ok(current: tuple[int, str] | None) -> None:
     print(
         f"chain ok: {current[0] if current else 0} events"
         + (f", head {current[1]}" if current else "")
     )
+
+
+def _verify_database(dsn: str, args: argparse.Namespace) -> int:
+    if getattr(args, "tolerate_torn_tail", False):
+        print("VERIFY FAIL: --tolerate-torn-tail applies to the file chain only", file=sys.stderr)
+        return 1
+    record_anchor = getattr(args, "record_anchor", False)
+    try:
+        anchor = chain.read_anchor() if args.against_anchor or record_anchor else None
+        result = db.verify(dsn, anchor_seq=anchor[0] if anchor else None)
+    except ChainError as exc:
+        print(f"VERIFY FAIL: {exc}", file=sys.stderr)
+        return 1
+    if result.errors:
+        for err in result.errors:
+            print(f"VERIFY FAIL: {err}", file=sys.stderr)
+        return 1
+    if anchor is not None:
+        if result.anchor_hash != anchor[1]:
+            print(
+                f"VERIFY FAIL: anchored head (seq {anchor[0]}) not in chain — "
+                "chain rewritten since last anchor",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"anchor ok: seq {anchor[0]} present")
+    if record_anchor and result.head:
+        chain.write_anchor(result.head)
+    _print_chain_ok(result.head)
     return 0
 
 
 def _cmd_ship(args: argparse.Namespace) -> int:
+    if chain.database_mode():
+        # The file isn't the chain in database mode; projecting it would ship a stale copy.
+        print("SHIP FAIL: ship projects the file chain, and a chain DSN is set", file=sys.stderr)
+        return 1
     from factory_events import ship as ship_mod
 
     try:
@@ -88,17 +144,27 @@ def _cmd_adapt(args: argparse.Namespace) -> int:
         try:
             count = high_power.adapt(reanchor=args.reanchor)
             print(f"high-power: {count} events appended")
-        except (high_power.WatermarkError, high_power.SourceError) as exc:
+        except (high_power.WatermarkError, high_power.SourceError, ChainError) as exc:
             print(f"ADAPT FAIL (high-power): {exc}", file=sys.stderr)
             failures += 1
     if args.source in ("change-manager", "all"):
         try:
             count = change_manager.adapt()
             print(f"change-manager: {count} events appended")
-        except (change_manager.ConfigError, OSError) as exc:
+        except (change_manager.ConfigError, OSError, ChainError) as exc:
             print(f"ADAPT FAIL (change-manager): {exc}", file=sys.stderr)
             failures += 1
     return 1 if failures else 0
+
+
+def _cmd_import_file(args: argparse.Namespace) -> int:
+    try:
+        head = db.import_file(chain.import_dsn(), Path(args.path).expanduser())
+    except ChainError as exc:
+        print(f"IMPORT FAIL: {exc}", file=sys.stderr)
+        return 1
+    print(f"imported: {head[0] if head else 0} events" + (f", head {head[1]}" if head else ""))
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -127,6 +193,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="accept one truncated final line (restored-copy verification)",
     )
+    verify.add_argument(
+        "--record-anchor",
+        action="store_true",
+        help="database chain: check the anchor, then anchor the verified head",
+    )
     verify.set_defaults(func=_cmd_verify)
 
     adapt = sub.add_parser("adapt", help="translate source logs into the store")
@@ -141,6 +212,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="truncate factory_events (never chain_heads) and replay",
     )
     ship_cmd.set_defaults(func=_cmd_ship)
+
+    import_cmd = sub.add_parser(
+        "import-file",
+        help="replay a verified events file into an empty database chain "
+        "(DSN from FACTORY_EVENTS_IMPORT_DSN)",
+    )
+    import_cmd.add_argument("--path", required=True, help="the events file to import")
+    import_cmd.set_defaults(func=_cmd_import_file)
     return parser
 
 
