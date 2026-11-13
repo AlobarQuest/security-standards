@@ -21,7 +21,7 @@ import pytest
 from emitter_contract import parse_event_id
 
 from factory_events import chain, db, db_setup, envelope, store
-from factory_events.adapters import high_power
+from factory_events.adapters import change_manager, high_power
 from factory_events.cli import main
 
 pytestmark = pytest.mark.integration
@@ -36,11 +36,18 @@ def _psycopg() -> Any:
     return import_module("psycopg")
 
 
-def _conninfo(base: str, **overrides: str) -> str:
+class Dsn(str):
+    """A DSN whose repr is redacted, so a failing assert can't print its password."""
+
+    def __repr__(self) -> str:
+        return "'<dsn redacted>'"
+
+
+def _conninfo(base: str, **overrides: str) -> Dsn:
     conninfo = import_module("psycopg.conninfo")
     params = conninfo.conninfo_to_dict(base)
     params.update(overrides)
-    return conninfo.make_conninfo(**params)
+    return Dsn(conninfo.make_conninfo(**params))
 
 
 @dataclass(frozen=True)
@@ -151,12 +158,14 @@ def test_roles_hold_only_their_grants(chain_db):
         "DELETE FROM factory_events",
         "TRUNCATE factory_events",
         "CREATE TABLE sneaky (id int)",
+        "CREATE TEMP TABLE sneaky (id int)",
         "ALTER TABLE factory_events DISABLE TRIGGER USER",
     ):
         _refused(chain_db.append, statement)
     for statement in (
         "INSERT INTO factory_events VALUES ('x', 2, repeat('a', 64), repeat('b', 64), '{}')",
         "CREATE TABLE sneaky (id int)",
+        "CREATE TEMP TABLE sneaky (id int)",
     ):
         _refused(chain_db.read, statement)
     with pytest.raises(db.ChainError):
@@ -294,6 +303,26 @@ def test_adapt_rerun_skips_held_events(chain_db, tmp_path, monkeypatch, capsys):
     assert not store.events_path().exists()
 
 
+def test_change_manager_rerun_skips_held_events(chain_db, monkeypatch):
+    raw = {
+        "item_id": 7,
+        "at": "2026-07-01T04:00:00+00:00",
+        "actor": "sync",
+        "event_type": "proposed",
+        "item_identity": "db-backup-x",
+    }
+    pages = {0: [{**raw, "id": 1}, {**raw, "id": 2}], 2: []}
+
+    def fetch(after_id: int, limit: int) -> list[dict]:
+        return pages.get(after_id, [])
+
+    monkeypatch.setenv(chain.APPEND_DSN_VAR, chain_db.append)
+    assert change_manager.adapt(fetch=fetch) == 2
+    (store.state_dir() / "change-manager.json").unlink()  # lose the cursor: replay from 0
+    assert change_manager.adapt(fetch=fetch) == 0
+    assert len(_rows(chain_db.read)) == 2
+
+
 # --- the history import ----------------------------------------------------------------
 
 
@@ -318,6 +347,23 @@ def test_import_refuses_a_tampered_file_and_writes_nothing(chain_db):
     store.events_path().write_text("\n".join(lines) + "\n")
     with pytest.raises(db.ChainError, match="does not verify"):
         db.import_file(chain_db.append, store.events_path())
+    assert _rows(chain_db.read) == []
+
+
+def test_import_refuses_a_duplicate_event_id_and_writes_nothing(chain_db, tmp_path):
+    """The file store never enforced unique ids, so a file can verify and still hold one."""
+    path = tmp_path / "dup.jsonl"
+    prev = store.GENESIS
+    with path.open("wb") as fh:
+        for seq in (1, 2):
+            event = _event(1)
+            digest = store.line_hash(seq, prev, event)
+            record = {"seq": seq, "prev_hash": prev, "hash": digest, "event": event}
+            fh.write(envelope.canonical_json(record) + b"\n")
+            prev = digest
+    assert store.verify_chain(path) == []
+    with pytest.raises(db.ChainError, match="duplicate event_id"):
+        db.import_file(chain_db.append, path)
     assert _rows(chain_db.read) == []
 
 

@@ -39,11 +39,12 @@ CREATE OR REPLACE TRIGGER factory_events_no_truncate
     BEFORE TRUNCATE ON public.factory_events
     FOR EACH STATEMENT EXECUTE FUNCTION public.factory_events_refuse_change();
 
--- Linear and honest, whatever the writer: a row must link to the row before it (seq 1 to the
--- genesis hash), and its hash must be store.line_hash's. With `event` canonical JSON, the
--- canonical record is {"event":<event>,"prev_hash":"<h>","seq":<n>} (keys sorted, no spaces),
--- so the trigger rebuilds it by concatenation. With seq and prev_hash each unique, the chain
--- can't fork or skip, and no row can carry a hash its contents don't produce.
+-- Linear, whatever the writer: a row must link to the row before it (seq 1 to the genesis
+-- hash), and its hash must equal sha256 of {"event":<event>,"prev_hash":"<h>","seq":<n>}
+-- built from the stored text. When `event` is canonical JSON, as the append path writes it,
+-- that is store.line_hash's formula. The trigger can't check that a direct INSERT's text is
+-- canonical; the verify walk, which re-canonicalizes, catches one that isn't. With seq and
+-- prev_hash each unique, the chain can't fork or skip.
 CREATE OR REPLACE FUNCTION public.factory_events_check_link() RETURNS trigger
 LANGUAGE plpgsql SET search_path = pg_catalog AS $$
 BEGIN
@@ -90,8 +91,14 @@ ALTER ROLE factory_events_read
     LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
 ALTER ROLE factory_events_read SET default_transaction_read_only = on;
 
--- No DDL for either role: Postgres before 15 grants CREATE on public to PUBLIC.
+-- No DDL for either role: Postgres before 15 grants CREATE on public to PUBLIC, and every
+-- version grants TEMPORARY on a new database to PUBLIC.
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+DO $$
+BEGIN
+    EXECUTE format('REVOKE TEMPORARY ON DATABASE %I FROM PUBLIC', current_database());
+END
+$$;
 
 -- Append-only: SELECT and INSERT, nothing else. Read-only: SELECT, nothing else.
 REVOKE ALL ON public.factory_events FROM PUBLIC, factory_events_append, factory_events_read;

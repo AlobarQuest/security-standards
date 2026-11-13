@@ -82,7 +82,7 @@ def test_read_dsn_alone_refuses_adapt(tmp_path, monkeypatch, capsys):
     assert not store.events_path().exists()
 
 
-@pytest.mark.parametrize("dsn", [UNREACHABLE_DSN, MALFORMED_DSN])
+@pytest.mark.parametrize("dsn", [UNREACHABLE_DSN, MALFORMED_DSN], ids=["unreachable", "malformed"])
 def test_emit_failure_writes_nothing_and_never_prints_the_dsn(tmp_path, dsn):
     proc = _run_cli(EMIT_ARGS, {chain.APPEND_DSN_VAR: dsn}, tmp_path)
     assert proc.returncode == 1
@@ -94,7 +94,7 @@ def test_emit_failure_writes_nothing_and_never_prints_the_dsn(tmp_path, dsn):
     assert record["op"] == "append" and record["outcome"] == "failure"
 
 
-@pytest.mark.parametrize("dsn", [UNREACHABLE_DSN, MALFORMED_DSN])
+@pytest.mark.parametrize("dsn", [UNREACHABLE_DSN, MALFORMED_DSN], ids=["unreachable", "malformed"])
 def test_verify_failure_never_prints_the_dsn(tmp_path, dsn):
     proc = _run_cli(["verify", "--against-anchor"], {chain.READ_DSN_VAR: dsn}, tmp_path)
     assert proc.returncode == 1

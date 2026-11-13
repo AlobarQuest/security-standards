@@ -180,6 +180,10 @@ def import_file(dsn: str, path: Path) -> tuple[int, str] | None:
     file_errors, _last, _count = store.walk_records(records)
     if file_errors:
         raise ChainError(f"import refused: the file does not verify: {file_errors[0]}")
+    ids = [rec["event"]["event_id"] for rec in records]
+    if len(set(ids)) != len(ids):
+        # The file never enforced unique ids; the table's primary key does.
+        raise ChainError("import refused: the file holds a duplicate event_id")
     try:
         with _connect(dsn) as conn:
             _lock(conn)

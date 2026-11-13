@@ -35,14 +35,16 @@ The ADRs name no variables, so FE-1 chose the following names. FE-2 (intent-pack
      refuses `TRUNCATE`. Both fire for every role, the owner included.
    - **Link trigger:** a `BEFORE INSERT` trigger refuses a row that doesn't link to the row before
      it. Seq 1 must link to the genesis hash.
-   - **Hash trigger:** the same `BEFORE INSERT` trigger refuses a row whose `hash` its contents
-     don't produce. It rebuilds the canonical record by concatenation, which works because
-     `event` is canonical JSON.
+   - **Hash trigger:** the same `BEFORE INSERT` trigger refuses a row whose `hash` isn't sha256
+     of `{"event":<stored text>,"prev_hash":...,"seq":...}`. For the canonical text the append
+     path writes, that's `line_hash`'s formula. The trigger can't check that a direct `INSERT`'s
+     text is canonical; the verify walk, which re-canonicalizes, catches one that isn't.
    - **Roles:** the script creates both roles with `LOGIN`, `NOSUPERUSER`, `NOCREATEDB`,
      `NOCREATEROLE`, `NOINHERIT`, `NOREPLICATION`, and `NOBYPASSRLS`. The read role also gets
      `default_transaction_read_only`.
-   - **Grants:** `REVOKE CREATE ON SCHEMA public FROM PUBLIC`, then `REVOKE ALL` on the table,
-     then append gets `SELECT, INSERT` and read gets `SELECT`.
+   - **Grants:** `REVOKE CREATE ON SCHEMA public FROM PUBLIC` and `REVOKE TEMPORARY` on the
+     database from PUBLIC, then `REVOKE ALL` on the table, then append gets `SELECT, INSERT` and
+     read gets `SELECT`.
    - **Passwords:** the script sets none. The owner sets each one afterwards with psql's
      `\password`, which sends a SCRAM verifier.
 2. **The roles script for FE-4** (`src/factory_events/db_setup.py`): run as
@@ -62,7 +64,8 @@ The ADRs name no variables, so FE-1 chose the following names. FE-2 (intent-pack
    row's `event_id` column equals its event's id. Any error raises `ChainError`.
 5. **The history import** (`db.import_file`, `factory_events import-file --path FILE`). It runs in
    these steps:
-   1. Parse the file once and walk the parsed records.
+   1. Parse the file once, walk the parsed records, and refuse a file that holds a duplicate
+      `event_id` (the file store never enforced uniqueness, but the primary key does).
    2. Take the append lock and refuse unless the database chain is empty.
    3. Replay each record through the append routine (`_append_in_tx`) in one transaction. Each
       replayed `(seq, hash)` must equal the file's.
@@ -131,9 +134,13 @@ A re-run against the database skips an event the database already holds. `chain.
 `SELECT event_id FROM factory_events` under the append role, and the deterministic ids
 (`high_power.py:93`, `change_manager.py:130`) are checked before each append.
 
-`test_adapt_rerun_skips_held_events` covers it. That test adapts 3 events, deletes the watermark,
-and re-runs: 0 appended, exit 0. A `--reanchor` re-run is also 0, and the database still holds 3
-rows. `emit` still fails on a duplicate id
+Two tests cover it, one per adapter:
+
+- **`test_adapt_rerun_skips_held_events`** (high-power) adapts 3 events, deletes the watermark,
+  and re-runs: 0 appended, exit 0. A `--reanchor` re-run is also 0, and the database still holds
+  3 rows.
+- **`test_change_manager_rerun_skips_held_events`** adapts 2 events, deletes the cursor, and
+  replays from id 0: 0 appended, and the database still holds 2 rows. `emit` still fails on a duplicate id
 (`test_duplicate_event_id_fails_and_writes_nothing`).
 
 ### The verify walk's cost
@@ -144,10 +151,10 @@ under the read role, as one streamed query, three runs each:
 
 | Measurement | Runs |
 |---|---|
-| `db.verify` walk | 0.17 s, 0.17 s, 0.20 s (0.18 s, 0.20 s, 0.19 s before the hash trigger) |
-| The import of the same chain, one transaction | 1.33 s to 1.73 s |
+| `db.verify` walk | 0.17 s to 0.27 s across eight runs (the higher figures while the Mac was loaded) |
+| The import of the same chain, one transaction | 1.33 s to 2.30 s |
 
-**The bound:** the walk is linear, about 50 µs per event of local CPU (hashing plus schema
+**The bound:** the walk is linear, about 50–70 µs per event of local CPU (hashing plus schema
 validation), plus network round trips. psycopg's named cursor fetches 100 rows per round trip, so
 3,751 rows is 38 round trips. Over the tailnet from the Mac, add 38 × RTT. At an assumed 20–40 ms
 RTT to `prod-vps`, that's about 0.8–1.5 s, which I didn't measure.
@@ -183,10 +190,12 @@ A search of `~/Projects` found no other consumer of `emit`'s stdout.
 | Check | Result |
 |---|---|
 | `make check` (ruff, ruff format, pyright, shellcheck, pytest) in the worktree | Green. pyright 0 errors; **221 passed**, 19 deselected (baseline at `1baec77`: 206 passed, 5 deselected). |
-| `make check-integration` in the worktree (throwaway container) | Green. **19 passed**: 14 new, 5 existing `test_factory_ship`. |
+| `make check-integration` in the worktree (throwaway container) | Green. **21 passed**: 16 new, 5 existing `test_factory_ship`. |
+| A forced failing assert under `-vv` with a fixture DSN in the expression | The DSN shows only as `<dsn redacted>`, and the throwaway password appears nowhere but the probe's own print line. Probe deleted. |
 | Throwaway containers left after the runs | 0 (`docker ps -a` filter). |
 | Security scanner (`security_scan.cli . --category security`) from the worktree root | No BLOCK. Four WARN `bws.reference-by-stable-uuid` findings, all in files this change doesn't touch. |
 | `/code-review` (medium) on `main...HEAD` | 8 findings: 5 fixed, 3 left with reasons (see Self-review). |
+| Advisor review before the PR | 7 points: change-manager dedupe test, DSN redaction in test output, duplicate-id import refusal, `TEMPORARY` revoke, and the trigger's wording are all fixed. The `\password` point is a concern. CI's `FACTORY_TEST_DSN` branch is checked on the PR. |
 
 New default-suite tests (`tests/test_factory_chain_mode.py`) cover the following:
 
@@ -205,8 +214,9 @@ New integration tests (`tests/test_factory_db.py`) cover the following:
 - **Linking:** the database appends link byte-for-byte as the file does, including a `1e300`
   float, a NUL escape, and non-ASCII text.
 - **Triggers:** they refuse `UPDATE`, `DELETE`, and `TRUNCATE` even for the owner.
-- **Role privileges:** the append role can't `UPDATE`, `DELETE`, `TRUNCATE`, `CREATE`, or disable
-  triggers. The read role can't `INSERT`, `CREATE`, or append.
+- **Role privileges:** the append role can't `UPDATE`, `DELETE`, `TRUNCATE`, `CREATE`, create a
+  temporary table, or disable triggers. The read role can't `INSERT`, `CREATE`, create a temporary
+  table, or append.
 - **Unlinked and forged rows:** they're refused for every role, with
   `IntegrityConstraintViolation` for the forged hash.
 - **Duplicates:** a duplicate id writes nothing.
@@ -215,9 +225,9 @@ New integration tests (`tests/test_factory_db.py`) cover the following:
 - **Tampering:** verify finds a tampered row.
 - **`emit`:** its stdout parses to the emitted id.
 - **Anchor:** the record, check, and refuse round trip passes under the append DSN alone.
-- **Adapt dedupe:** described in the preceding settlement.
-- **Import:** it reproduces the file, refuses a second time, and refuses a tampered file with
-  nothing written.
+- **Adapt dedupe:** for both adapters, described in the preceding settlement.
+- **Import:** it reproduces the file, refuses a second time, and refuses a tampered file and a
+  file with a duplicate id, each with nothing written.
 - **The 3,751-event walk:** described in the preceding settlement.
 
 ## Files changed
@@ -283,9 +293,15 @@ trigger, and all pass, so the formula matches `line_hash` for them.
   `verify` uses the read DSN when set, else the append DSN, whose role holds `SELECT`, still in a
   read-only transaction. If HQ wants the nightly to hold the read DSN too, that's a grant for
   Devon's FE-4 decision.
-- **Role passwords aren't set by the roles script.** The owner sets them with psql `\password`
-  after running it, so no password sits in a file, a statement, or the server log. FE-4's act 2
-  must include that step.
+- **Role passwords aren't set by the roles script.** The owner sets them afterwards, so no password
+  sits in a file, a statement, or the server log. FE-4's act 2 must include that step. psql's
+  `\password` prompts on a TTY, which an unattended HQ act may not have. The alternative is
+  psycopg's `PGconn.encrypt_password(password, role, b"scram-sha-256")`, which exists in the
+  installed psycopg and builds the SCRAM verifier on the client, then
+  `ALTER ROLE ... PASSWORD '<verifier>'`. FE-4 picks one; FE-1 builds neither.
+- **The import refuses a file with a duplicate `event_id`.** The file store never enforced unique
+  ids, and the table's primary key does. If the Mac file holds one, act 5's import stops with
+  nothing written, and the duplicate needs a decision before the cut-over can continue.
 - **The schema needs Postgres 14 or later** (`CREATE OR REPLACE TRIGGER`). FE-4's resource must be
   14 or later; the tests run on 16.
 - **The import holds the append lock for its whole transaction:** about 1.5 s at 3,751 events
@@ -311,7 +327,9 @@ trigger, and all pass, so the formula matches `line_hash` for them.
 - **Code Brain 5 (security):** no DSN, password, or driver error text is logged or printed. Errors
   carry only the exception type, and they're raised `from None`, so no traceback carries the
   driver's text. Tests use a sentinel password in unreachable and malformed DSNs and assert that
-  it never appears in stdout or stderr.
+  it never appears in stdout or stderr. The parametrized test ids are names, not DSNs, and the
+  integration fixture wraps every DSN in a `str` subclass whose `repr` is redacted, so a failing
+  assert can't print one (checked with a forced failure).
 - **Infra Brain Database 6 (no schema setup at build time):** the roles script is a hand-run module
   (`python -m factory_events.db_setup`). No build step, image, or start-up path calls it, and the
   append and verify paths run no DDL. `ship`'s per-call DDL isn't carried over.
