@@ -149,6 +149,20 @@ def test_emit_stdout_parses_when_json_logs_share_stdout(monkeypatch, capsys):
     assert not store.events_path().exists()
 
 
+def test_corrupt_anchor_fails_verify_cleanly(monkeypatch, capsys):
+    chain.anchor_path().parent.mkdir(parents=True)
+    chain.anchor_path().write_text('{"seq": 3')
+    monkeypatch.setenv(chain.READ_DSN_VAR, UNREACHABLE_DSN)
+    assert main(["verify", "--against-anchor"]) == 1
+    assert "VERIFY FAIL: the anchor at" in capsys.readouterr().err
+
+
+def test_ship_refuses_in_database_mode(monkeypatch, capsys):
+    monkeypatch.setenv(chain.APPEND_DSN_VAR, UNREACHABLE_DSN)
+    assert main(["ship"]) == 1
+    assert "SHIP FAIL" in capsys.readouterr().err
+
+
 def test_anchor_round_trips(tmp_path):
     assert chain.read_anchor() is None
     chain.write_anchor((5, "b" * 64))

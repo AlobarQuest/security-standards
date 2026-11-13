@@ -4,6 +4,7 @@
 -- items 2, 3 and 14; ADR-0059 amendment 7 act 2), through `python -m factory_events.db_setup`.
 -- It never runs in an image build step, and neither the append path nor a verifier runs DDL.
 -- It runs in one transaction and is safe to run again. It needs Postgres 14 or later.
+-- It refuses no row the append path writes: that path stores canonical JSON (db.py).
 --
 -- It sets no password. The owner sets each role's password afterwards with psql's
 -- `\password <role>`, which sends only a SCRAM verifier, so no password is in this file, in a
@@ -38,8 +39,11 @@ CREATE OR REPLACE TRIGGER factory_events_no_truncate
     BEFORE TRUNCATE ON public.factory_events
     FOR EACH STATEMENT EXECUTE FUNCTION public.factory_events_refuse_change();
 
--- Linear, whatever the writer: a row must link to the row before it (seq 1 to the genesis
--- hash). With seq and prev_hash each unique, the chain can't fork or skip.
+-- Linear and honest, whatever the writer: a row must link to the row before it (seq 1 to the
+-- genesis hash), and its hash must be store.line_hash's. With `event` canonical JSON, the
+-- canonical record is {"event":<event>,"prev_hash":"<h>","seq":<n>} (keys sorted, no spaces),
+-- so the trigger rebuilds it by concatenation. With seq and prev_hash each unique, the chain
+-- can't fork or skip, and no row can carry a hash its contents don't produce.
 CREATE OR REPLACE FUNCTION public.factory_events_check_link() RETURNS trigger
 LANGUAGE plpgsql SET search_path = pg_catalog AS $$
 BEGIN
@@ -52,6 +56,12 @@ BEGIN
         SELECT 1 FROM public.factory_events WHERE seq = NEW.seq - 1 AND hash = NEW.prev_hash
     ) THEN
         RAISE EXCEPTION 'factory_events: seq % does not link to seq %', NEW.seq, NEW.seq - 1
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    IF NEW.hash <> encode(sha256(convert_to(
+        '{"event":' || NEW.event || ',"prev_hash":"' || NEW.prev_hash
+            || '","seq":' || NEW.seq || '}', 'UTF8')), 'hex') THEN
+        RAISE EXCEPTION 'factory_events: seq % hash does not match its contents', NEW.seq
             USING ERRCODE = 'integrity_constraint_violation';
     END IF;
     RETURN NEW;

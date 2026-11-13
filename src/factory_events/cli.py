@@ -92,8 +92,8 @@ def _verify_database(dsn: str, args: argparse.Namespace) -> int:
         print("VERIFY FAIL: --tolerate-torn-tail applies to the file chain only", file=sys.stderr)
         return 1
     record_anchor = getattr(args, "record_anchor", False)
-    anchor = chain.read_anchor() if args.against_anchor or record_anchor else None
     try:
+        anchor = chain.read_anchor() if args.against_anchor or record_anchor else None
         result = db.verify(dsn, anchor_seq=anchor[0] if anchor else None)
     except ChainError as exc:
         print(f"VERIFY FAIL: {exc}", file=sys.stderr)
@@ -118,6 +118,10 @@ def _verify_database(dsn: str, args: argparse.Namespace) -> int:
 
 
 def _cmd_ship(args: argparse.Namespace) -> int:
+    if chain.database_mode():
+        # The file isn't the chain in database mode; projecting it would ship a stale copy.
+        print("SHIP FAIL: ship projects the file chain, and a chain DSN is set", file=sys.stderr)
+        return 1
     from factory_events import ship as ship_mod
 
     try:

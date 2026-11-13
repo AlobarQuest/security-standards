@@ -176,6 +176,20 @@ def test_a_row_that_does_not_link_is_refused_whatever_the_role(chain_db):
     assert len(_rows(chain_db.read)) == 1
 
 
+def test_a_linked_row_with_a_forged_hash_is_refused_whatever_the_role(chain_db):
+    db.append_event(chain_db.append, _event(1))
+    head = _rows(chain_db.read)[-1][2]
+    event = envelope.canonical_json(_event(2)).decode().replace("'", "''")
+    for dsn in (chain_db.append, chain_db.owner):
+        refused = _refused(
+            dsn,
+            "INSERT INTO factory_events VALUES "
+            f"('{_event(2)['event_id']}', 2, '{head}', repeat('d', 64), '{event}')",
+        )
+        assert refused == "IntegrityConstraintViolation"
+    assert len(_rows(chain_db.read)) == 1
+
+
 def test_duplicate_event_id_fails_and_writes_nothing(chain_db):
     db.append_event(chain_db.append, _event(1))
     with pytest.raises(db.ChainError, match="UniqueViolation"):

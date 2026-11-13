@@ -70,13 +70,19 @@ def read_anchor() -> tuple[int, str] | None:
     path = anchor_path()
     if not path.exists():
         return None
-    data = json.loads(path.read_text())
-    return int(data["seq"]), str(data["hash"])
+    try:
+        data = json.loads(path.read_text())
+        return int(data["seq"]), str(data["hash"])
+    except (ValueError, KeyError, TypeError) as exc:
+        raise db.ChainError(f"the anchor at {path} is unreadable ({type(exc).__name__})") from exc
 
 
 def write_anchor(head: tuple[int, str]) -> None:
     path = anchor_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps({"seq": head[0], "hash": head[1]}))
+    with tmp.open("w") as fh:
+        fh.write(json.dumps({"seq": head[0], "hash": head[1]}))
+        fh.flush()
+        os.fsync(fh.fileno())
     os.replace(tmp, path)

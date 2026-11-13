@@ -126,10 +126,10 @@ def verify(dsn: str, anchor_seq: int | None = None) -> WalkResult:
     When anchor_seq is given, also return the hash the chain holds at that seq, read in the
     same snapshot as the walk.
     """
-    from psycopg import IsolationLevel
-
     anchor: dict = {"seq": anchor_seq}
     try:
+        from psycopg import IsolationLevel  # lazy, inside the try: a missing driver fails closed
+
         with _connect(dsn) as conn:
             conn.read_only = True
             conn.isolation_level = IsolationLevel.REPEATABLE_READ
@@ -172,10 +172,14 @@ def import_file(dsn: str, path: Path) -> tuple[int, str] | None:
     """
     if not path.exists():
         raise ChainError(f"import refused: {path} does not exist")
-    file_errors = store.verify_chain(path)
+    # Read once: the records verified are the records replayed.
+    try:
+        records = list(store.iter_records(path))
+    except json.JSONDecodeError:
+        raise ChainError("import refused: the file has an unparseable line") from None
+    file_errors, _last, _count = store.walk_records(records)
     if file_errors:
         raise ChainError(f"import refused: the file does not verify: {file_errors[0]}")
-    records = list(store.iter_records(path))
     try:
         with _connect(dsn) as conn:
             _lock(conn)
