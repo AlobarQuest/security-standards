@@ -191,6 +191,7 @@ A search of `~/Projects` found no other consumer of `emit`'s stdout.
 |---|---|
 | `make check` (ruff, ruff format, pyright, shellcheck, pytest) in the worktree | Green. pyright 0 errors; **221 passed**, 19 deselected (baseline at `1baec77`: 206 passed, 5 deselected). |
 | `make check-integration` in the worktree (throwaway container) | Green. **21 passed**: 16 new, 5 existing `test_factory_ship`. |
+| CI on PR #90 | All green. "Factory-store integration tests" (`extended-tests.yml`, the `FACTORY_TEST_DSN` branch of `check-integration.sh`, Postgres 16 service): **21 passed**, 221 deselected. "Lint, type-check, and test" (`quality.yml`): collected 242, **221 passed**, 21 deselected. Both scans pass. |
 | A forced failing assert under `-vv` with a fixture DSN in the expression | The DSN shows only as `<dsn redacted>`, and the throwaway password appears nowhere but the probe's own print line. Probe deleted. |
 | Throwaway containers left after the runs | 0 (`docker ps -a` filter). |
 | Security scanner (`security_scan.cli . --category security`) from the worktree root | No BLOCK. Four WARN `bws.reference-by-stable-uuid` findings, all in files this change doesn't touch. |
@@ -310,6 +311,7 @@ trigger, and all pass, so the formula matches `line_hash` for them.
   a small `print(json.dumps(...))` helper rather than the stdlib `logging` module. A
   `StreamHandler` binds `sys.stdout` once, which breaks capture under pytest. If Code Brain's
   logging road names a library, the helper is one function to swap.
+- **The repo's `CLAUDE.md` invariant is out of date.** It says `quality.yml`'s `make check` doesn't exist here and CI never runs the pytest suite. On PR #90, `quality.yml` ran `make check` and passed 221 tests. I didn't edit `CLAUDE.md` in this PR, because it's out of scope.
 - **Not live yet.** Nothing here is wired into `scripts/factory-events-nightly.sh`, deployed, or
   pointed at a live database. No DSN is set anywhere.
 
