@@ -15,7 +15,7 @@ import json
 import os
 from pathlib import Path
 
-from factory_events import store
+from factory_events import chain, store
 from factory_events.envelope import EnvelopeError, deterministic_event_id, make_event
 
 DEFAULT_SOURCE = Path.home() / ".claude" / "audit" / "high-power-actions.jsonl"
@@ -137,7 +137,7 @@ def adapt(source: Path | None = None, reanchor: bool = False) -> int:
                     "re-run with --reanchor to accept the file as a new baseline"
                 )
         start = count
-    known = store.event_ids()
+    known = chain.event_ids()
     appended = 0
     for offset, raw_line in enumerate(lines[start:], start=start + 1):
         if not raw_line.strip():
@@ -150,7 +150,7 @@ def adapt(source: Path | None = None, reanchor: bool = False) -> int:
             ) from exc
         if event["event_id"] in known:
             continue
-        store.append_event(event)
+        chain.append_event(event)
         known.add(event["event_id"])
         appended += 1
     _save_watermark(lines)

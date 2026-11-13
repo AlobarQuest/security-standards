@@ -2,7 +2,8 @@
 
 One envelope (`factory-event/v1`, JSON Schema in `schema/`) across all factory
 systems; hash-chained append-only JSONL store at `~/.factory/events.jsonl`;
-nightly Postgres projection. Spec:
+nightly Postgres projection; and the Postgres chain of record that replaces the
+file once its DSNs are set (see "The database chain"). Spec:
 `docs/superpowers/specs/2026-07-02-ws11-audit-event-envelope-design.md`.
 
 ## CLI
@@ -22,13 +23,63 @@ nightly Postgres projection. Spec:
 - `ship [--rebuild]` — upsert into the projection + anchor the current head.
   `--rebuild` truncates `factory_events` (never `chain_heads`) and replays.
 
+- `import-file --path FILE` — replay a verified events file, in order, into an
+  empty database chain in one transaction; commits only if the imported head
+  equals the file's head. Reads its DSN from `FACTORY_EVENTS_IMPORT_DSN` only.
+
+## The database chain (orchestrator ADR-0055 amendment 24)
+
+`emit`, `adapt` and `verify` use the Postgres chain of record when either DSN
+below is set, and the file chain, exactly as before, when neither is. With
+either set, a command that lacks the DSN it needs fails; none falls back to the
+file. DSNs come from the environment only and are never printed or logged.
+
+| Variable | Role | Used by |
+|---|---|---|
+| `FACTORY_EVENTS_APPEND_DSN` | append-only | `emit`, `adapt`; `verify` when no read DSN is set |
+| `FACTORY_EVENTS_READ_DSN` | read-only | `verify` |
+| `FACTORY_EVENTS_IMPORT_DSN` | not decided here | `import-file` |
+| `FACTORY_EVENTS_OWNER_DSN` | the database owner | `python -m factory_events.db_setup` |
+
+- **Table** (`chain_schema.sql`): `factory_events(event_id PK, seq UNIQUE,
+  prev_hash UNIQUE, hash, event)`. `event` is the event's canonical JSON text,
+  and `hash` uses the file's formula, so `store.walk_records` verifies both
+  chains. Triggers refuse every `UPDATE`, `DELETE` and `TRUNCATE`, whatever
+  the role, and an `INSERT` that doesn't link to the row before it.
+- **Append** (`db.append_event`): one transaction that takes a shared advisory
+  lock, reads the head, and inserts the next row. Any failure rolls back, logs
+  the error's type, and raises.
+- **Verify** (`db.verify`): one read-only repeatable-read transaction that
+  walks every row from `seq` 1. Readers in other repositories select
+  `seq, prev_hash, hash, event_id, event ORDER BY seq`.
+- **Anchor**: `verify --record-anchor` checks the existing anchor, then writes
+  the verified head to `$FACTORY_EVENTS_HOME/state/chain-anchor.json` on the
+  verifying machine, outside the database. `verify --against-anchor` refuses a
+  chain that no longer holds the anchored `(seq, hash)`.
+- **Logs**: JSON records on stdout, one per append, verify or import. `emit`
+  prints the bare event id as stdout's last line, and every JSON record it
+  prints carries that same id.
+
+### Set up the database (the database owner, once)
+
+Run this by hand as an announced act. Never run it in an image build step or at
+start-up:
+
+    FACTORY_EVENTS_OWNER_DSN=... python -m factory_events.db_setup
+
+It creates the table, its triggers, and the roles `factory_events_append` and
+`factory_events_read`, with no password. Then set each role's password with
+psql's `\password factory_events_append` (and `_read`), which sends only a
+SCRAM verifier.
+
 ## Integration tests
 
-The default repository gate excludes projection-store integration tests so
-`make check` remains warning-clean and skip-clean without requiring a live DSN.
-Run the explicit integration gate only against a disposable PostgreSQL database:
-
-    FACTORY_TEST_DSN=postgresql://... make check-integration
+The default repository gate excludes the database integration tests so
+`make check` needs no Postgres. `make check-integration` runs them against
+`FACTORY_TEST_DSN` when it's set (CI), or else against a throwaway
+`postgres:16-alpine` container that it starts on a random local port and
+removes on exit. `FACTORY_TEST_DSN` must name a superuser on a disposable
+cluster: the tests create databases and roles and drop tables.
 
 ## Actor identity — the agent registry (WS-1.2)
 
