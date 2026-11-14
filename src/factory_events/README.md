@@ -131,5 +131,50 @@ resuming with `ship --rebuild`.
 
 ## Nightly
 
-`com.devon.factory-events` (launchd, 03:30) → `scripts/factory-events-nightly.sh`:
-adapt all → verify --against-anchor → ship → healthcheck ping with the head hash.
+`com.devon.factory-events` (launchd, 03:30) runs `scripts/factory-events-nightly.sh`, deployed
+to `~/.claude/bin/` by `make install`. The switch file `~/.factory/chain-db.env` picks its mode.
+
+### The switch file
+
+`~/.factory/chain-db.env` holds no secret. It's exactly three lines, in `KEY=value` form with no
+quoting:
+
+    FACTORY_EVENTS_DB_HOST=<host>
+    FACTORY_EVENTS_DB_PORT=<port>
+    FACTORY_EVENTS_DB_NAME=<database>
+
+The nightly parses the file and never sources it. It fails the run, and pings `/fail`, if the
+path isn't a readable regular file (for example, a directory or a symlink), or if the file has
+an unknown, missing, or duplicated key, an empty value, a blank line, or a value with a quote or
+a space. Its failure message
+names the line number and key, never a value.
+
+The staging copy `~/.factory/chain-db.env.pending` holds the same three lines. Only the
+orchestrator's session wrapper reads it, for the one-time `import-file`; the nightly never does.
+The FE-5 cut-over renames it to `chain-db.env` after the import, and that rename switches every
+holder at once.
+
+### File mode (`chain-db.env` absent)
+
+adapt all → verify --against-anchor → ship → healthcheck ping with the ship output. No chain
+variable is set, so every command uses the file chain.
+
+### Database mode (`chain-db.env` present)
+
+1. Reads the three settings from the switch file.
+2. Reads the `factory-events-nightly` account's access token from Keychain `Claude` /
+   `BWS_ACCESS_TOKEN_FACTORY_EVENTS_NIGHTLY`, and fetches `factory-events-append-password`
+   (see `.bws-secrets.toml`) with it. The change-manager bearer still comes through its own
+   identity, as in file mode.
+3. Runs verify --against-anchor, before anything appends: it checks
+   `$FACTORY_EVENTS_HOME/state/chain-anchor.json` when that file exists, and is a plain
+   database verify when it doesn't.
+4. Runs adapt all, then verify --record-anchor, which checks the anchor again and anchors the
+   verified head.
+5. Skips ship, which refuses in database mode, and pings success with the verify output. The
+   run's `chain:factory-events` observation reports `shipped` 0.
+
+The password and the three settings reach only the `python -m factory_events` children, as an
+assignment prefix on each command line: never exported, never in argv, never logged. The access
+token reaches only its `bws` process the same way. The script unsets the password after the
+last command. Any failed step fails the run through `fail`; nothing falls back to the file chain.
