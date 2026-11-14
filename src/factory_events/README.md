@@ -32,8 +32,8 @@ file once a role's password is set (see "The database chain"). Spec:
 
 `emit`, `adapt` and `verify` use the Postgres chain of record when either
 role's password is set, and the file chain, exactly as before, when neither is.
-With either set, a command that lacks a setting it needs, or whose port isn't a
-number, fails and names the variable; none falls back to the file. Each BWS secret holds only its role's
+With either set, a command that lacks a setting it needs fails and names the
+variable; none falls back to the file. Each BWS secret holds only its role's
 password (orchestrator ADR-0055 amendment 26). `factory_events.chain` builds
 each connection from the password, the three settings and the role name, and
 passes them to psycopg as keyword parameters, never as a URL. Values come from

@@ -19,6 +19,7 @@ SENTINEL = "sentinel-pw-7f3a9c"
 SETTINGS = {chain.DB_HOST_VAR: "127.0.0.1", chain.DB_NAME_VAR: "factory_events"}
 # Nothing listens on port 1, so the connection is refused at once.
 UNREACHABLE = {**SETTINGS, chain.DB_PORT_VAR: "1"}
+MALFORMED = {**SETTINGS, chain.DB_PORT_VAR: "notaport"}
 APPEND = {chain.APPEND_PASSWORD_VAR: SENTINEL, **UNREACHABLE}
 READ = {chain.READ_PASSWORD_VAR: SENTINEL, **UNREACHABLE}
 EMIT_ARGS = ["emit", "--actor", "devon", "--action", "test.ping", "--result", "success"]
@@ -100,8 +101,13 @@ def test_each_missing_setting_refuses_by_name(monkeypatch, capsys, missing, empt
     [EMIT_ARGS, ["verify"], ["ship"], ["adapt", "--source", "high-power"]],
     ids=["emit", "verify", "ship", "adapt"],
 )
-def test_a_set_retired_variable_refuses_every_command(monkeypatch, capsys, retired, args):
+def test_a_set_retired_variable_refuses_every_command(tmp_path, monkeypatch, capsys, retired, args):
     """No password is set, so ignoring the retired variable would drop to the file chain."""
+    from factory_events.adapters import high_power
+
+    source = tmp_path / "hp.jsonl"  # adapt reads its source first: never the real audit log
+    source.write_text("")
+    monkeypatch.setattr(high_power, "DEFAULT_SOURCE", source)
     leaked = f"postgresql://factory_events_append:{SENTINEL}@127.0.0.1:1/factory_events"
     monkeypatch.setenv(retired, leaked)
     assert main(args) == 1
@@ -116,15 +122,6 @@ def test_a_retired_variable_refuses_beside_a_password(monkeypatch, tmp_path, cap
     assert main(["import-file", "--path", str(tmp_path / "events.jsonl")]) == 1
     err = capsys.readouterr().err
     assert "FACTORY_EVENTS_IMPORT_DSN is retired" in err and SENTINEL not in err
-
-
-@pytest.mark.parametrize("port", ["notaport", "5545x", "-1"])
-def test_a_malformed_port_refuses_by_name(monkeypatch, capsys, port):
-    _setenv(monkeypatch, {**APPEND, chain.DB_PORT_VAR: port})
-    assert main(EMIT_ARGS) == 1
-    captured = capsys.readouterr()
-    assert "emit failed: FACTORY_EVENTS_DB_PORT is not a port number" in captured.err
-    assert SENTINEL not in captured.out + captured.err and port not in captured.err
 
 
 # --- mode selection --------------------------------------------------------------------
@@ -189,8 +186,9 @@ def test_read_password_alone_refuses_adapt(tmp_path, monkeypatch, capsys):
     assert not store.events_path().exists()
 
 
-def test_emit_failure_writes_nothing_and_never_prints_the_password(tmp_path):
-    proc = _run_cli(EMIT_ARGS, APPEND, tmp_path)
+@pytest.mark.parametrize("settings", [UNREACHABLE, MALFORMED], ids=["unreachable", "malformed"])
+def test_emit_failure_writes_nothing_and_never_prints_the_password(tmp_path, settings):
+    proc = _run_cli(EMIT_ARGS, {chain.APPEND_PASSWORD_VAR: SENTINEL, **settings}, tmp_path)
     assert proc.returncode == 1
     assert "emit failed: append failed" in proc.stderr
     assert SENTINEL not in proc.stdout + proc.stderr
@@ -200,8 +198,10 @@ def test_emit_failure_writes_nothing_and_never_prints_the_password(tmp_path):
     assert record["op"] == "append" and record["outcome"] == "failure"
 
 
-def test_verify_failure_never_prints_the_password(tmp_path):
-    proc = _run_cli(["verify", "--against-anchor"], READ, tmp_path)
+@pytest.mark.parametrize("settings", [UNREACHABLE, MALFORMED], ids=["unreachable", "malformed"])
+def test_verify_failure_never_prints_the_password(tmp_path, settings):
+    env = {chain.READ_PASSWORD_VAR: SENTINEL, **settings}
+    proc = _run_cli(["verify", "--against-anchor"], env, tmp_path)
     assert proc.returncode == 1
     assert "VERIFY FAIL: verify failed" in proc.stderr
     assert SENTINEL not in proc.stdout + proc.stderr

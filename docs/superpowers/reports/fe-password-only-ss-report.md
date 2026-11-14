@@ -49,19 +49,18 @@ and a test pins them to `chain_schema.sql`.
     `ChainError` and print `VERIFY FAIL` or `SHIP FAIL` without a traceback.
 - Item 7: `import-file` connects with `connection_params(APPEND_ROLE)`, and
   `FACTORY_EVENTS_IMPORT_DSN` is retired.
-- One addition the amendment doesn't name: a `FACTORY_EVENTS_DB_PORT` that isn't decimal digits
-  refuses with `FACTORY_EVENTS_DB_PORT is not a port number`. Without this check it failed as an
-  opaque driver error that looks like an unreachable database. The amendment's fail-closed rule
-  already covers it, and the message carries no value.
+- A malformed `FACTORY_EVENTS_DB_PORT` goes to the driver unchanged. It fails as
+  `append failed (<type>)` or `verify failed (<type>)`, like an unreachable database. The
+  amendment settles missing settings only. See "Concerns" for a proposal.
 
 ## Tests and checks
 
 | Check | Result |
 |---|---|
 | `make check` baseline at `cb832f3` | 221 passed, 21 deselected |
-| `make check` (ruff check, ruff format --check, pyright, pytest) | 249 passed, 24 deselected (272 collected); ruff and pyright clean |
+| `make check` (ruff check, ruff format --check, pyright, pytest) | 272 collected, 248 selected, 248 passed, 24 deselected; ruff and pyright clean |
 | `make check-integration` baseline at `cb832f3`, disposable `postgres:16-alpine` from `scripts/check-integration.sh` | 21 passed |
-| `make check-integration` | 24 passed, 249 deselected |
+| `make check-integration` | 24 passed, 248 deselected |
 | Security scanner from the worktree root (`--category security`) | rc 0; BLOCK 0, WARN 4, INFO 1 |
 
 The scanner's WARN and INFO findings are all in files this change doesn't touch: the
@@ -74,17 +73,17 @@ existing test fixtures and history, and the scanner prints them truncated.
   - The builder: exact keyword parameters for each role, and a repr and str without the password.
   - The role constants match `chain_schema.sql`.
   - Each missing setting refuses by name, unset and empty: 4 settings × 2 cases.
-  - Each retired variable refuses emit, verify, ship and adapt: 3 × 4 cases. A retired variable
-    beside a password refuses `import-file`.
-  - A malformed port refuses by name (3 cases).
+  - Each retired variable refuses emit, verify, ship and adapt: 3 × 4 cases. The adapt case
+    points `high_power.DEFAULT_SOURCE` at an empty temporary file, so it never reads the real
+    audit log. A retired variable beside a password refuses `import-file`.
   - Mode selection: settings with no password stay in file mode, and the verify role is picked
     for read-only, append-only, and both.
   - `import-file` with only the read password refuses.
   - Every refusal test uses the placeholder password `sentinel-pw-7f3a9c`. It asserts the value
     is absent from the exception text and from captured stdout and stderr. `jsonlog` writes its
-    JSON records to stdout, so captured stdout is the captured log stream. The existing
-    unreachable-database subprocess tests for emit, verify and import keep the same assertion
-    against the driver path.
+    JSON records to stdout, so captured stdout is the captured log stream. The subprocess tests
+    for emit, verify and import keep the same assertion on the driver path, with an unreachable
+    port (`1`) and a malformed port (`notaport`).
 - `tests/test_factory_db.py` (integration):
   - Each role connects from `ConnectParams` built from `FACTORY_TEST_DSN`'s host and port. The
     owner stays a DSN for `db_setup`.
@@ -111,10 +110,11 @@ existing test fixtures and history, and the scanner prints them truncated.
 
 ## Self-review
 
-I ran `/code-review` at medium on `main...HEAD` and acted on 2 of its 7 findings:
+I ran `/code-review` at medium on `main...HEAD` and acted on 1 of its 7 findings:
 
-- Acted on: a malformed port now refuses by name (the check is described in "Behavior").
 - Acted on: the `import-file` comment now says why it uses the append role.
+- Not acted on: validating the port. I added the check, then removed it: the amendment doesn't
+  settle it, and the handoff sends an unsettled behavior choice to HQ. See "Concerns".
 - Not acted on: `database_mode()` raises. The amendment requires the retired refusal on every
   path, file mode included, and every CLI caller catches `ChainError`. The adapters call
   `chain.event_ids()` before they write anything.
@@ -137,8 +137,10 @@ I ran `/code-review` at medium on `main...HEAD` and acted on 2 of its 7 findings
 - `ConnectParams.as_kwargs()` returns a plain dict, whose repr includes the password. Increments 2
   and 3 must pass it straight to `psycopg.connect` and never log it. The dataclass itself is safe
   to repr.
-- The handoff's standards don't cover input validation of non-secret settings. The port check is
-  my reading of item 5's fail-closed rule.
+- Proposal for HQ: refuse a non-numeric `FACTORY_EVENTS_DB_PORT` by name, for example
+  `FACTORY_EVENTS_DB_PORT is not a port number`. Today a port typo looks the same as an
+  unreachable database. It fails closed either way, and no message carries a value. The amendment
+  doesn't settle this, and the handoff's standards don't cover validating non-secret settings.
 - No tool showed me a credential value. I fetched no BWS secret and called no infraops tool.
 
 ## Standards followed
