@@ -135,6 +135,7 @@ if [ "$CHAIN_MODE" = "database" ]; then
     if [ -L "$CHAIN_DB_FILE" ] || [ ! -f "$CHAIN_DB_FILE" ]; then
         fail "$CHAIN_DB_FILE is not a regular file"
     fi
+    [ -r "$CHAIN_DB_FILE" ] || fail "$CHAIN_DB_FILE is not readable"
     CHAIN_DB_HOST=""
     CHAIN_DB_PORT=""
     CHAIN_DB_NAME=""

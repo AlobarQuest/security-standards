@@ -374,6 +374,17 @@ def test_a_symlink_at_the_switch_path_fails(nightly: Nightly, tmp_path: Path) ->
     assert nightly.commands() == []
 
 
+def test_an_unreadable_switch_file_fails(nightly: Nightly) -> None:
+    nightly.switch.write_text(SWITCH)
+    nightly.switch.chmod(0)
+
+    result = nightly.run()
+
+    assert_failed(nightly, result)
+    assert "chain-db.env is not readable" in nightly.log.read_text()
+    assert nightly.commands() == []
+
+
 def test_a_malformed_line_never_reaches_the_log(nightly: Nightly) -> None:
     nightly.switch.write_text(SWITCH + "pasted-secret-value\n")
 

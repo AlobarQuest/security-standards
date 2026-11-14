@@ -144,8 +144,9 @@ quoting:
     FACTORY_EVENTS_DB_NAME=<database>
 
 The nightly parses the file and never sources it. It fails the run, and pings `/fail`, if the
-path isn't a regular file (a directory or a symlink), or if the file has an unknown, missing,
-duplicated, or empty key, a blank line, or a value with a quote or a space. Its failure message
+path isn't a readable regular file (for example, a directory or a symlink), or if the file has
+an unknown, missing, or duplicated key, an empty value, a blank line, or a value with a quote or
+a space. Its failure message
 names the line number and key, never a value.
 
 The staging copy `~/.factory/chain-db.env.pending` holds the same three lines. Only the
