@@ -184,6 +184,11 @@ def test_trigger_refuses_update_delete_truncate_even_for_the_owner(chain_db):
 
 def test_roles_hold_only_their_grants(chain_db):
     db.append_event(chain_db.append, _event(1))
+    _assert_roles_hold_only_their_grants(chain_db)
+    assert len(_rows(chain_db.owner)) == 1
+
+
+def _assert_roles_hold_only_their_grants(chain_db: ChainDb) -> None:
     for statement in (
         "UPDATE factory_events SET event = '{}'",
         "DELETE FROM factory_events",
@@ -201,7 +206,6 @@ def test_roles_hold_only_their_grants(chain_db):
         _refused(chain_db.read, statement)
     with pytest.raises(db.ChainError):
         db.append_event(chain_db.read, _event(2))
-    assert len(_rows(chain_db.owner)) == 1
 
 
 def test_a_row_that_does_not_link_is_refused_whatever_the_role(chain_db):
@@ -418,6 +422,107 @@ def test_import_refuses_a_duplicate_event_id_and_writes_nothing(chain_db, tmp_pa
     with pytest.raises(db.ChainError, match="duplicate event_id"):
         db.import_file(chain_db.append, path)
     assert _rows(chain_db.read) == []
+
+
+# --- re-running the setup (D-51 A) ----------------------------------------------------
+
+# D-51 A's owner act after a rollback past a successful import: drop the chain, re-run
+# db_setup, re-import. The FE-5 plan quotes this statement.
+OWNER_DROP_STATEMENT = "DROP TABLE public.factory_events"
+
+
+def _schema_state(owner: Dsn) -> dict[str, list[tuple]]:
+    """What the setup builds, read from the catalog. No role password or verifier."""
+    queries = {
+        "columns": "SELECT column_name, data_type, is_nullable FROM information_schema.columns"
+        " WHERE table_schema = 'public' AND table_name = 'factory_events' ORDER BY 1",
+        "constraints": "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint"
+        " WHERE conrelid = 'public.factory_events'::regclass ORDER BY 1",
+        "table_owner": "SELECT tableowner FROM pg_tables"
+        " WHERE schemaname = 'public' AND tablename = 'factory_events'",
+        "triggers": "SELECT tgname, tgfoid::regprocedure::text, tgtype, tgenabled FROM pg_trigger"
+        " WHERE tgrelid = 'public.factory_events'::regclass AND NOT tgisinternal ORDER BY 1",
+        "functions": "SELECT proname, proowner::regrole::text, prosecdef, proconfig, prosrc"
+        " FROM pg_proc WHERE proname LIKE 'factory\\_events\\_%' ORDER BY 1",
+        "grants": "SELECT grantee, privilege_type FROM information_schema.role_table_grants"
+        " WHERE table_schema = 'public' AND table_name = 'factory_events' ORDER BY 1, 2",
+        "roles": "SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolinherit,"
+        " rolreplication, rolbypassrls, rolconfig FROM pg_roles"
+        " WHERE rolname LIKE 'factory\\_events\\_%' ORDER BY 1",
+    }
+    with _open(owner) as conn:
+        return {name: conn.execute(query).fetchall() for name, query in queries.items()}
+
+
+def _assert_owner_refused_changes(chain_db: ChainDb) -> None:
+    for statement in (
+        "UPDATE factory_events SET event = '{}'",
+        "DELETE FROM factory_events",
+        "TRUNCATE factory_events",
+    ):
+        assert _refused(chain_db.owner, statement) == "InsufficientPrivilege"
+
+
+def _assert_role_passwords_work(chain_db: ChainDb) -> None:
+    for params in (chain_db.append, chain_db.read):
+        with _open(params) as conn:
+            assert conn.execute("SELECT current_user").fetchone() == (params.user,)
+
+
+def test_setup_reruns_on_a_populated_chain_and_changes_nothing(chain_db):
+    records = [db.append_event(chain_db.append, _event(n)) for n in range(5)]
+    rows, state = _rows(chain_db.owner), _schema_state(chain_db.owner)
+    assert len(rows) == 5 and state["triggers"] and state["grants"]
+    db_setup.setup(chain_db.owner)
+    assert _rows(chain_db.owner) == rows
+    assert _schema_state(chain_db.owner) == state
+    _assert_owner_refused_changes(chain_db)
+    _assert_roles_hold_only_their_grants(chain_db)
+    _assert_role_passwords_work(chain_db)
+    following = db.append_event(chain_db.append, _event(5))
+    assert (following["seq"], following["prev_hash"]) == (6, records[-1]["hash"])
+    result = db.verify(chain_db.read)
+    assert result.errors == [] and result.head == (6, following["hash"])
+
+
+def test_owner_drop_then_setup_then_reimport_restores_the_chain(chain_db, monkeypatch, capsys):
+    fresh = _schema_state(chain_db.owner)  # the fixture's fresh setup, before any row
+    records = [store.append_event(_event(n)) for n in range(5)]
+    _setenv(monkeypatch, chain_db.env())  # the import runs as the append role
+    assert main(["import-file", "--path", str(store.events_path())]) == 0
+    imported = _rows(chain_db.owner)
+    assert len(imported) == 5
+
+    with _open(chain_db.owner) as conn:  # the D-51 A act: one owner statement, then the setup
+        conn.execute(OWNER_DROP_STATEMENT)
+    db_setup.setup(chain_db.owner)
+    assert _rows(chain_db.owner) == []
+    assert _schema_state(chain_db.owner) == fresh
+    _assert_role_passwords_work(chain_db)  # no ALTER ROLE since the fixture's
+
+    capsys.readouterr()
+    assert main(["import-file", "--path", str(store.events_path())]) == 0
+    assert f"imported: 5 events, head {records[-1]['hash']}" in capsys.readouterr().out
+    assert _rows(chain_db.owner) == imported
+    _setenv(monkeypatch, chain_db.env(chain.READ_ROLE))
+    assert main(["verify"]) == 0
+    assert f"chain ok: 5 events, head {records[-1]['hash']}" in capsys.readouterr().out
+    _assert_owner_refused_changes(chain_db)  # after the import: a row trigger needs a row
+    _assert_roles_hold_only_their_grants(chain_db)
+
+
+def test_only_the_owner_can_drop_the_chain(chain_db):
+    for n in range(5):
+        db.append_event(chain_db.append, _event(n))
+    rows, state = _rows(chain_db.owner), _schema_state(chain_db.owner)
+    assert _refused(chain_db.append, OWNER_DROP_STATEMENT) == "InsufficientPrivilege"
+    # The read role's sessions are read-only (default_transaction_read_only), refused first.
+    assert _refused(chain_db.read, OWNER_DROP_STATEMENT) == "ReadOnlySqlTransaction"
+    # A read-write transaction lifts that, and the drop still needs the owner.
+    read_write_drop = f"SET TRANSACTION READ WRITE; {OWNER_DROP_STATEMENT}"
+    assert _refused(chain_db.read, read_write_drop) == "InsufficientPrivilege"
+    assert _rows(chain_db.owner) == rows
+    assert _schema_state(chain_db.owner) == state
 
 
 # --- the verify walk's cost ------------------------------------------------------------
