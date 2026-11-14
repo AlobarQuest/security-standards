@@ -32,7 +32,13 @@ def git_repo(tmp_path):
     return Helper()
 
 
-_CHAIN_DSN_VARS = (
+# Every chain setting, the retired whole-DSN names included (a set one refuses every command).
+_CHAIN_VARS = (
+    "FACTORY_EVENTS_APPEND_PASSWORD",
+    "FACTORY_EVENTS_READ_PASSWORD",
+    "FACTORY_EVENTS_DB_HOST",
+    "FACTORY_EVENTS_DB_PORT",
+    "FACTORY_EVENTS_DB_NAME",
     "FACTORY_EVENTS_APPEND_DSN",
     "FACTORY_EVENTS_READ_DSN",
     "FACTORY_EVENTS_IMPORT_DSN",
@@ -41,8 +47,8 @@ _CHAIN_DSN_VARS = (
 
 
 @pytest.fixture(autouse=True)
-def _no_ambient_chain_dsn(monkeypatch):
-    """A shell holding a real chain DSN must never reach it from a test; tests that need the
-    database chain set a disposable one themselves."""
-    for name in _CHAIN_DSN_VARS:
+def _no_ambient_chain_settings(monkeypatch):
+    """A shell holding a real chain password must never reach it from a test; tests that need
+    the database chain set disposable settings themselves."""
+    for name in _CHAIN_VARS:
         monkeypatch.delenv(name, raising=False)

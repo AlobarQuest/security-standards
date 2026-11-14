@@ -3,7 +3,7 @@
 One envelope (`factory-event/v1`, JSON Schema in `schema/`) across all factory
 systems; hash-chained append-only JSONL store at `~/.factory/events.jsonl`;
 nightly Postgres projection; and the Postgres chain of record that replaces the
-file once its DSNs are set (see "The database chain"). Spec:
+file once a role's password is set (see "The database chain"). Spec:
 `docs/superpowers/specs/2026-07-02-ws11-audit-event-envelope-design.md`.
 
 ## CLI
@@ -25,21 +25,33 @@ file once its DSNs are set (see "The database chain"). Spec:
 
 - `import-file --path FILE` — replay a verified events file, in order, into an
   empty database chain in one transaction; commits only if the imported head
-  equals the file's head. Reads its DSN from `FACTORY_EVENTS_IMPORT_DSN` only.
+  equals the file's head. Connects as the append role, from
+  `FACTORY_EVENTS_APPEND_PASSWORD` and the three DB settings.
 
 ## The database chain (orchestrator ADR-0055 amendment 24)
 
-`emit`, `adapt` and `verify` use the Postgres chain of record when either DSN
-below is set, and the file chain, exactly as before, when neither is. With
-either set, a command that lacks the DSN it needs fails; none falls back to the
-file. DSNs come from the environment only and are never printed or logged.
+`emit`, `adapt` and `verify` use the Postgres chain of record when either
+role's password is set, and the file chain, exactly as before, when neither is.
+With either set, a command that lacks a setting it needs fails and names the
+variable; none falls back to the file. Each BWS secret holds only its role's
+password (orchestrator ADR-0055 amendment 26). `factory_events.chain` builds
+each connection from the password, the three settings and the role name, and
+passes them to psycopg as keyword parameters, never as a URL. Values come from
+the environment only and are never printed or logged.
 
-| Variable | Role | Used by |
+| Variable | Secret | Used by |
 |---|---|---|
-| `FACTORY_EVENTS_APPEND_DSN` | append-only | `emit`, `adapt`; `verify` when no read DSN is set |
-| `FACTORY_EVENTS_READ_DSN` | read-only | `verify` |
-| `FACTORY_EVENTS_IMPORT_DSN` | not decided here | `import-file` |
-| `FACTORY_EVENTS_OWNER_DSN` | the database owner | `python -m factory_events.db_setup` |
+| `FACTORY_EVENTS_APPEND_PASSWORD` | Yes: role `factory_events_append` | `emit`, `adapt`, `import-file`; `verify` when no read password is set |
+| `FACTORY_EVENTS_READ_PASSWORD` | Yes: role `factory_events_read` | `verify` |
+| `FACTORY_EVENTS_DB_HOST` | No | every database command; no default |
+| `FACTORY_EVENTS_DB_PORT` | No | every database command; no default |
+| `FACTORY_EVENTS_DB_NAME` | No | every database command; no default |
+| `FACTORY_EVENTS_OWNER_DSN` | The database owner's DSN, not a BWS secret | `python -m factory_events.db_setup` |
+
+The role names are constants in `chain.py`, beside the schema that creates
+them, not settings. `FACTORY_EVENTS_APPEND_DSN`, `FACTORY_EVENTS_READ_DSN` and
+`FACTORY_EVENTS_IMPORT_DSN` are retired: any command refuses while one is set,
+and names it.
 
 - **Table** (`chain_schema.sql`): `factory_events(event_id PK, seq UNIQUE,
   prev_hash UNIQUE, hash, event)`. `event` is the event's canonical JSON text,
