@@ -25,6 +25,12 @@ that rule, made concrete.
    dirs, and any local credential file.
 6. **A surfaced committed token is LEAKED → tell the human to ROTATE it.** Deleting it from the
    file is not enough; assume it is compromised the moment it appears.
+7. **A secret holds only its value.** Store the password, token, or key alone, never a connection
+   string, URL with credentials, or config blob. Host, port, database, user or role names, and
+   other non-secret settings live in the consumer's config or code, and the consumer builds the
+   connection string at run time. That keeps config changes out of the secret store and keeps
+   each secret rotatable without touching its settings. (Devon, 2026-11-14: "I am not liking
+   that we are storing code, effectively, in BWS as a secret.")
 
 ## How to actually fetch a secret (copy these patterns)
 
