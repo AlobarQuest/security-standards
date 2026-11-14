@@ -149,20 +149,17 @@ if [ "$CHAIN_MODE" = "database" ]; then
         KEY="${LINE%%=*}"
         VALUE="${LINE#*=}"
         case "$KEY" in
-            FACTORY_EVENTS_DB_HOST | FACTORY_EVENTS_DB_PORT | FACTORY_EVENTS_DB_NAME) ;;
+            FACTORY_EVENTS_DB_HOST) PREVIOUS="$CHAIN_DB_HOST"; CHAIN_DB_HOST="$VALUE" ;;
+            FACTORY_EVENTS_DB_PORT) PREVIOUS="$CHAIN_DB_PORT"; CHAIN_DB_PORT="$VALUE" ;;
+            FACTORY_EVENTS_DB_NAME) PREVIOUS="$CHAIN_DB_NAME"; CHAIN_DB_NAME="$VALUE" ;;
             *) fail "$CHAIN_DB_FILE line $LINE_NO has an unknown key" ;;
         esac
+        [ -z "$PREVIOUS" ] || fail "$CHAIN_DB_FILE sets $KEY twice"
         # No quoting and no spaces: a value is a host, a port or a database name, taken literally.
         case "$VALUE" in
             "" | *[!A-Za-z0-9._:-]*)
                 fail "$CHAIN_DB_FILE line $LINE_NO: $KEY is empty or has a character outside [A-Za-z0-9._:-]" ;;
         esac
-        case "$KEY" in
-            FACTORY_EVENTS_DB_HOST) [ -z "$CHAIN_DB_HOST" ] && CHAIN_DB_HOST="$VALUE" && continue ;;
-            FACTORY_EVENTS_DB_PORT) [ -z "$CHAIN_DB_PORT" ] && CHAIN_DB_PORT="$VALUE" && continue ;;
-            FACTORY_EVENTS_DB_NAME) [ -z "$CHAIN_DB_NAME" ] && CHAIN_DB_NAME="$VALUE" && continue ;;
-        esac
-        fail "$CHAIN_DB_FILE sets $KEY twice"
     done < "$CHAIN_DB_FILE"
     [ -n "$CHAIN_DB_HOST" ] || fail "$CHAIN_DB_FILE has no FACTORY_EVENTS_DB_HOST"
     [ -n "$CHAIN_DB_PORT" ] || fail "$CHAIN_DB_FILE has no FACTORY_EVENTS_DB_PORT"
