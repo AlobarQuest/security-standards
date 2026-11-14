@@ -90,14 +90,15 @@ Then I ran `make check-integration` and restored the test file from a saved copy
 | # | Target test | Mutation | Result |
 | --- | --- | --- | --- |
 | M1 | 1 | The `DO` block's conditional `CREATE ROLE` replaced with unconditional `CREATE ROLE` for both roles (not idempotent) | Test 1 failed: `psycopg.errors.DuplicateObject: role "factory_events_append" already exists`. |
-| M2 | 1 | `GRANT SELECT, INSERT, UPDATE` to the append role instead of `SELECT, INSERT` | Test 1 failed on the `_schema_state` compare (the `grants` item differed). |
-| M3 | 2 | The read role's `GRANT SELECT` removed from the re-run's schema | Test 2 failed (`verify failed (InsufficientPrivilege)` and the state compare). |
-| M4 | 2 | The `factory_events_no_truncate` trigger removed from the re-run's schema | Test 2 failed on the `_schema_state` compare (the `triggers` item differed). |
+| M2 | 1 | `GRANT SELECT, INSERT, UPDATE` to the append role instead of `SELECT, INSERT` | Test 1 failed on the `_schema_state` compare; with `-vv`, the differing item was `grants`. |
+| M3 | 2 | The read role's `GRANT SELECT` removed from the re-run's schema | Test 2 failed on the `_schema_state` compare; with `-vv`, the differing item was `grants`. |
+| M4 | 2 | The `factory_events_no_truncate` trigger removed from the re-run's schema | Test 2 failed on the `_schema_state` compare; with `-vv`, the differing item was `triggers`. |
 | M5 | 3 | The owner runs `ALTER TABLE factory_events OWNER TO factory_events_append` before the refusal checks | Test 3 failed: `DID NOT RAISE Error` on the append role's drop. |
 
 The scratch mutations assigned the module attribute without restoring it, so later tests in the
 same run also set up from the mutated schema. M1 also produced three fixture errors, and M3 also
-failed `test_verify_walk_of_a_mac_sized_chain`. Each target test failed as listed, and the
+failed `test_verify_walk_of_a_mac_sized_chain` (`verify failed (InsufficientPrivilege)`). I re-ran
+M2 to M4 on the target test alone (`-k`, `-vv`) to read the differing item. Each target test failed as listed, and the
 unmutated suite passes.
 
 ## Whether CI runs these tests
@@ -125,6 +126,7 @@ default gate (`quality.yml` → `make check`) deselects them through
 - The extraction of `_assert_roles_hold_only_their_grants` keeps the existing test's statements
   and order. The one behavior difference: the existing test's final row-count assert moved from
   the helper's end into the test, unchanged.
+- `/code-review` (low) on `origin/main...HEAD` reported no findings.
 - I added no fixture. Every new test uses `chain_db` as is, so each still gets its own database.
 
 ## Findings
@@ -137,10 +139,11 @@ the roles with their passwords. The act needs only the owner's `DROP TABLE` and 
 
 - In the tests the owner is the cluster's superuser (`postgres`), because the harness connects as
   one. On the VPS the owner is the role that ran `db_setup` and owns the table. Owning the table is
-  enough for `DROP TABLE`. The re-run also runs `REVOKE CREATE ON SCHEMA public` and
-  `REVOKE TEMPORARY ON DATABASE`, which need the schema's and the database's owner. The first
-  setup on the VPS already ran both as that owner, so the re-run needs nothing new. The tests
-  don't prove a non-superuser owner, though.
+  enough for `DROP TABLE`. The re-run also runs `ALTER ROLE` on both roles,
+  `REVOKE CREATE ON SCHEMA public`, and `REVOKE TEMPORARY ON DATABASE`, which need more than table
+  ownership (role privileges, and the schema's and the database's owner). I assume the VPS owner
+  holds these because it ran the first setup, but the tests don't prove it: they ran only as a
+  superuser. HQ can confirm it against the real owner role before the act.
 - The act runs on a table whose rows are an imported copy. Any rows a holder appended after the
   import would go with the drop. The plan's rollback point (no holder has appended) is the
   precondition, and the act would need to check it, for example by checking that the database head
