@@ -2,7 +2,7 @@ Outcome: done
 
 # FE-5 D-51 A: the chain setup re-runs on a populated database
 
-Handoff: `sds-hq/state/handoffs/fe-5-d51-setup-rerun.md`. Branch `hq/fe-5-d51-setup-rerun`, base
+Handoff: `sds-hq/state/handoffs/fe-5-d51-setup-rerun.md`. PR #94. Branch `hq/fe-5-d51-setup-rerun`, base
 `origin/main` `4e83d7a8`. Worker W-161.
 
 ## What I built
