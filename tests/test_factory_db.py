@@ -37,7 +37,7 @@ def _psycopg() -> Any:
 
 
 class Dsn(str):
-    """A DSN whose repr is redacted, so a failing assert can't print its password."""
+    """The owner's DSN, its repr redacted so a failing assert can't print its password."""
 
     def __repr__(self) -> str:
         return "'<dsn redacted>'"
@@ -52,9 +52,37 @@ def _conninfo(base: str, **overrides: str) -> Dsn:
 
 @dataclass(frozen=True)
 class ChainDb:
-    owner: str
-    append: str
-    read: str
+    """The owner connects by DSN (db_setup's, out of amendment 26's scope); each role connects
+    from parts, as a holder does, and `env` holds the settings a holder's environment sets."""
+
+    owner: Dsn
+    append: db.ConnectParams
+    read: db.ConnectParams
+
+    def env(self, role: str = chain.APPEND_ROLE, **overrides: str) -> dict[str, str]:
+        params = self.append if role == chain.APPEND_ROLE else self.read
+        password_var = (
+            chain.APPEND_PASSWORD_VAR if role == chain.APPEND_ROLE else chain.READ_PASSWORD_VAR
+        )
+        settings = {
+            password_var: params.password,
+            chain.DB_HOST_VAR: params.host,
+            chain.DB_PORT_VAR: params.port,
+            chain.DB_NAME_VAR: params.dbname,
+        }
+        return {**settings, **overrides}
+
+
+def _open(target: Dsn | db.ConnectParams) -> Any:
+    psycopg = _psycopg()
+    if isinstance(target, db.ConnectParams):
+        return psycopg.connect(**target.as_kwargs())
+    return psycopg.connect(target)
+
+
+def _setenv(monkeypatch, env: dict[str, str]) -> None:
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
 
 
 @pytest.fixture(autouse=True)
@@ -73,6 +101,9 @@ def chain_db() -> Iterator[ChainDb]:
     with psycopg.connect(base, autocommit=True) as admin:
         admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
     owner = _conninfo(base, dbname=name)
+    parts = import_module("psycopg.conninfo").conninfo_to_dict(base)
+    assert parts.get("host") and parts.get("port"), "FACTORY_TEST_DSN must name a host and port"
+    address = {"host": str(parts["host"]), "port": str(parts["port"]), "dbname": name}
     try:
         db_setup.setup(owner)
         with psycopg.connect(owner, autocommit=True) as conn:
@@ -84,8 +115,8 @@ def chain_db() -> Iterator[ChainDb]:
                 )
         yield ChainDb(
             owner=owner,
-            append=_conninfo(owner, user="factory_events_append", password=ROLE_PASSWORD),
-            read=_conninfo(owner, user="factory_events_read", password=ROLE_PASSWORD),
+            append=db.ConnectParams(**address, user=chain.APPEND_ROLE, password=ROLE_PASSWORD),
+            read=db.ConnectParams(**address, user=chain.READ_ROLE, password=ROLE_PASSWORD),
         )
     finally:
         with psycopg.connect(base, autocommit=True) as admin:
@@ -106,16 +137,16 @@ def _event(n: int, action: str = "test.ping") -> dict:
     )
 
 
-def _rows(dsn: str) -> list[tuple]:
-    with _psycopg().connect(dsn) as conn:
+def _rows(target: Dsn | db.ConnectParams) -> list[tuple]:
+    with _open(target) as conn:
         return conn.execute(
             "SELECT seq, prev_hash, hash, event_id, event FROM factory_events ORDER BY seq"
         ).fetchall()
 
 
-def _refused(dsn: str, statement: str) -> str:
+def _refused(target: Dsn | db.ConnectParams, statement: str) -> str:
     psycopg = _psycopg()
-    with pytest.raises(psycopg.Error) as info, psycopg.connect(dsn) as conn:
+    with pytest.raises(psycopg.Error) as info, _open(target) as conn:
         conn.execute(statement)
     return type(info.value).__name__
 
@@ -189,9 +220,9 @@ def test_a_linked_row_with_a_forged_hash_is_refused_whatever_the_role(chain_db):
     db.append_event(chain_db.append, _event(1))
     head = _rows(chain_db.read)[-1][2]
     event = envelope.canonical_json(_event(2)).decode().replace("'", "''")
-    for dsn in (chain_db.append, chain_db.owner):
+    for target in (chain_db.append, chain_db.owner):
         refused = _refused(
-            dsn,
+            target,
             "INSERT INTO factory_events VALUES "
             f"('{_event(2)['event_id']}', 2, '{head}', repeat('d', 64), '{event}')",
         )
@@ -256,7 +287,7 @@ def _cli(args: list[str], env_extra: dict[str, str], home: Path) -> subprocess.C
 
 def test_emit_stdout_parses_to_the_emitted_id(chain_db, tmp_path):
     args = ["emit", "--actor", "devon", "--action", "package.approved", "--result", "success"]
-    proc = _cli([*args, "--ref", "test"], {chain.APPEND_DSN_VAR: chain_db.append}, tmp_path)
+    proc = _cli([*args, "--ref", "test"], chain_db.env(), tmp_path)
     assert proc.returncode == 0, proc.stderr
     lines = proc.stdout.splitlines()
     assert json.loads(lines[0])["outcome"] == "ok"  # a JSON log record shares stdout
@@ -267,8 +298,30 @@ def test_emit_stdout_parses_to_the_emitted_id(chain_db, tmp_path):
     assert ROLE_PASSWORD not in proc.stdout + proc.stderr
 
 
+@pytest.mark.parametrize(
+    "override",
+    [{chain.DB_PORT_VAR: "1"}, {chain.APPEND_PASSWORD_VAR: "wrong-password"}],
+    ids=["wrong-port", "wrong-password"],
+)
+def test_one_wrong_part_fails_closed_and_prints_no_password(chain_db, tmp_path, override):
+    args = ["emit", "--actor", "devon", "--action", "test.ping", "--result", "success"]
+    proc = _cli([*args, "--ref", "test"], chain_db.env(**override), tmp_path)
+    assert proc.returncode == 1
+    assert "emit failed: append failed" in proc.stderr
+    assert ROLE_PASSWORD not in proc.stdout + proc.stderr
+    assert "wrong-password" not in proc.stdout + proc.stderr
+    assert _rows(chain_db.read) == []
+
+
+def test_verify_under_the_read_password(chain_db, monkeypatch, capsys):
+    db.append_event(chain_db.append, _event(1))
+    _setenv(monkeypatch, chain_db.env(chain.READ_ROLE))
+    assert main(["verify"]) == 0
+    assert "chain ok: 1 events" in capsys.readouterr().out
+
+
 def test_verify_anchor_round_trip(chain_db, monkeypatch, capsys):
-    monkeypatch.setenv(chain.APPEND_DSN_VAR, chain_db.append)  # the nightly's one DSN
+    _setenv(monkeypatch, chain_db.env())  # the nightly's one password
     for n in range(3):
         db.append_event(chain_db.append, _event(n))
     assert main(["verify", "--record-anchor"]) == 0
@@ -290,7 +343,7 @@ def test_adapt_rerun_skips_held_events(chain_db, tmp_path, monkeypatch, capsys):
     source = tmp_path / "hp.jsonl"
     source.write_text(FIXTURE.read_text())
     monkeypatch.setattr(high_power, "DEFAULT_SOURCE", source)
-    monkeypatch.setenv(chain.APPEND_DSN_VAR, chain_db.append)
+    _setenv(monkeypatch, chain_db.env())
     assert main(["adapt", "--source", "high-power"]) == 0
     assert "high-power: 3 events appended" in capsys.readouterr().out
     # Lose the watermark: the re-run replays every line, and the deterministic ids dedupe
@@ -316,7 +369,7 @@ def test_change_manager_rerun_skips_held_events(chain_db, monkeypatch):
     def fetch(after_id: int, limit: int) -> list[dict]:
         return pages.get(after_id, [])
 
-    monkeypatch.setenv(chain.APPEND_DSN_VAR, chain_db.append)
+    _setenv(monkeypatch, chain_db.env())
     assert change_manager.adapt(fetch=fetch) == 2
     (store.state_dir() / "change-manager.json").unlink()  # lose the cursor: replay from 0
     assert change_manager.adapt(fetch=fetch) == 0
@@ -328,7 +381,7 @@ def test_change_manager_rerun_skips_held_events(chain_db, monkeypatch):
 
 def test_import_reproduces_the_file_chain(chain_db, monkeypatch, capsys):
     records = [store.append_event(_event(n)) for n in range(5)]
-    monkeypatch.setenv(chain.IMPORT_DSN_VAR, chain_db.append)
+    _setenv(monkeypatch, chain_db.env())  # the import runs as the append role
     assert main(["import-file", "--path", str(store.events_path())]) == 0
     assert f"imported: 5 events, head {records[-1]['hash']}" in capsys.readouterr().out
     assert [(r[0], r[1], r[2], r[3]) for r in _rows(chain_db.read)] == [

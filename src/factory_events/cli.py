@@ -1,7 +1,7 @@
 """factory-events CLI: emit, verify, adapt, ship, import-file.
 
-emit, verify and adapt use the database chain when FACTORY_EVENTS_APPEND_DSN or
-FACTORY_EVENTS_READ_DSN is set (chain.py), and the file chain when neither is.
+emit, verify and adapt use the database chain when FACTORY_EVENTS_APPEND_PASSWORD or
+FACTORY_EVENTS_READ_PASSWORD is set (chain.py), and the file chain when neither is.
 """
 
 import argparse
@@ -48,9 +48,13 @@ def _cmd_emit(args: argparse.Namespace) -> int:
 
 
 def _cmd_verify(args: argparse.Namespace) -> int:
-    dsn = chain.verify_dsn()
-    if dsn:
-        return _verify_database(dsn, args)
+    try:
+        params = chain.verify_params()
+    except ChainError as exc:
+        print(f"VERIFY FAIL: {exc}", file=sys.stderr)
+        return 1
+    if params:
+        return _verify_database(params, args)
     if getattr(args, "record_anchor", False):
         print("VERIFY FAIL: --record-anchor needs the database chain", file=sys.stderr)
         return 1
@@ -87,14 +91,14 @@ def _print_chain_ok(current: tuple[int, str] | None) -> None:
     )
 
 
-def _verify_database(dsn: str, args: argparse.Namespace) -> int:
+def _verify_database(params: db.ConnectParams, args: argparse.Namespace) -> int:
     if getattr(args, "tolerate_torn_tail", False):
         print("VERIFY FAIL: --tolerate-torn-tail applies to the file chain only", file=sys.stderr)
         return 1
     record_anchor = getattr(args, "record_anchor", False)
     try:
         anchor = chain.read_anchor() if args.against_anchor or record_anchor else None
-        result = db.verify(dsn, anchor_seq=anchor[0] if anchor else None)
+        result = db.verify(params, anchor_seq=anchor[0] if anchor else None)
     except ChainError as exc:
         print(f"VERIFY FAIL: {exc}", file=sys.stderr)
         return 1
@@ -118,9 +122,17 @@ def _verify_database(dsn: str, args: argparse.Namespace) -> int:
 
 
 def _cmd_ship(args: argparse.Namespace) -> int:
-    if chain.database_mode():
+    try:
+        database_mode = chain.database_mode()
+    except ChainError as exc:
+        print(f"SHIP FAIL: {exc}", file=sys.stderr)
+        return 1
+    if database_mode:
         # The file isn't the chain in database mode; projecting it would ship a stale copy.
-        print("SHIP FAIL: ship projects the file chain, and a chain DSN is set", file=sys.stderr)
+        print(
+            "SHIP FAIL: ship projects the file chain, and a chain password is set",
+            file=sys.stderr,
+        )
         return 1
     from factory_events import ship as ship_mod
 
@@ -159,7 +171,8 @@ def _cmd_adapt(args: argparse.Namespace) -> int:
 
 def _cmd_import_file(args: argparse.Namespace) -> int:
     try:
-        head = db.import_file(chain.import_dsn(), Path(args.path).expanduser())
+        params = chain.connection_params(chain.APPEND_ROLE)  # amendment 25 item 4
+        head = db.import_file(params, Path(args.path).expanduser())
     except ChainError as exc:
         print(f"IMPORT FAIL: {exc}", file=sys.stderr)
         return 1
@@ -216,7 +229,7 @@ def build_parser() -> argparse.ArgumentParser:
     import_cmd = sub.add_parser(
         "import-file",
         help="replay a verified events file into an empty database chain "
-        "(DSN from FACTORY_EVENTS_IMPORT_DSN)",
+        "(as the append role: FACTORY_EVENTS_APPEND_PASSWORD and the DB settings)",
     )
     import_cmd.add_argument("--path", required=True, help="the events file to import")
     import_cmd.set_defaults(func=_cmd_import_file)

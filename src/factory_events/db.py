@@ -4,13 +4,14 @@ Rows link as the file's lines do (store.line_hash), so store.walk_records verifi
 chain_schema.sql holds the table, its triggers and its two roles; this module runs no DDL.
 
 Every failure surfaces as ChainError, whose text names only the operation and the error's
-type: a driver error's text can repeat its DSN, so it's never logged, printed or chained.
+type: a driver error's text can repeat connection details, so it's never logged, printed or
+chained.
 psycopg is imported lazily, so the file chain never loads it.
 """
 
 import json
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -42,11 +43,35 @@ class WalkResult:
     anchor_hash: str | None = None
 
 
-def _connect(dsn: str) -> Any:
+@dataclass(frozen=True)
+class ConnectParams:
+    """One role's connection, as psycopg keyword parameters (chain.connection_params builds it).
+
+    Never a URL, so no string holds the password and the address together, and the repr
+    leaves the password out.
+    """
+
+    host: str
+    port: str
+    dbname: str
+    user: str
+    password: str = field(repr=False)
+
+    def as_kwargs(self) -> dict[str, str]:
+        return asdict(self)
+
+
+def _connect(params: ConnectParams) -> Any:
     import psycopg  # lazy: the file chain must not require it
 
     return psycopg.connect(
-        dsn, connect_timeout=CONNECT_TIMEOUT_SECONDS, application_name="factory_events"
+        host=params.host,
+        port=params.port,
+        dbname=params.dbname,
+        user=params.user,
+        password=params.password,
+        connect_timeout=CONNECT_TIMEOUT_SECONDS,
+        application_name="factory_events",
     )
 
 
@@ -73,15 +98,15 @@ def _append_in_tx(conn: Any, event: dict) -> dict:
     return record
 
 
-def append_event(dsn: str, event: dict) -> dict:
+def append_event(params: ConnectParams, event: dict) -> dict:
     """Append one event in one transaction (items 6 and 7): any failure writes nothing."""
     try:
-        with _connect(dsn) as conn:  # commits on a clean exit, rolls back on an exception
+        with _connect(params) as conn:  # commits on a clean exit, rolls back on an exception
             _lock(conn)
             record = _append_in_tx(conn, event)
     except Exception as exc:
         # Not swallowed: logged by type and raised as ChainError. `from None` keeps the
-        # driver's text, which can repeat the DSN, out of every traceback.
+        # driver's text, which can repeat connection details, out of every traceback.
         log("append", "failure", event_id=event.get("event_id"), error_type=type(exc).__name__)
         raise ChainError(f"append failed ({type(exc).__name__})") from None
     log(
@@ -94,9 +119,9 @@ def append_event(dsn: str, event: dict) -> dict:
     return record
 
 
-def event_ids(dsn: str) -> set[str]:
+def event_ids(params: ConnectParams) -> set[str]:
     try:
-        with _connect(dsn) as conn:
+        with _connect(params) as conn:
             return {row[0] for row in conn.execute("SELECT event_id FROM factory_events")}
     except Exception as exc:
         log("event_ids", "failure", error_type=type(exc).__name__)  # logged, then raised
@@ -120,7 +145,7 @@ def _rows_as_records(rows: Iterator[tuple], anchor: dict) -> Iterator[dict]:
         }
 
 
-def verify(dsn: str, anchor_seq: int | None = None) -> WalkResult:
+def verify(params: ConnectParams, anchor_seq: int | None = None) -> WalkResult:
     """Walk every row from seq 1 in one read-only repeatable-read transaction (item 8).
 
     When anchor_seq is given, also return the hash the chain holds at that seq, read in the
@@ -130,7 +155,7 @@ def verify(dsn: str, anchor_seq: int | None = None) -> WalkResult:
     try:
         from psycopg import IsolationLevel  # lazy, inside the try: a missing driver fails closed
 
-        with _connect(dsn) as conn:
+        with _connect(params) as conn:
             conn.read_only = True
             conn.isolation_level = IsolationLevel.REPEATABLE_READ
             with conn.transaction(), conn.cursor(name="factory_events_walk") as cur:
@@ -164,11 +189,11 @@ def _replay(conn: Any, records: list[dict]) -> None:
         raise ChainError("import refused: the imported head does not equal the file's head")
 
 
-def import_file(dsn: str, path: Path) -> tuple[int, str] | None:
+def import_file(params: ConnectParams, path: Path) -> tuple[int, str] | None:
     """Replay a verified events file into an empty database chain, in order, in one transaction.
 
     Commits only when the imported head equals the file's head, so a refused import writes
-    nothing. The caller chooses the DSN, and with it the role (Devon's decision before FE-5).
+    nothing. The caller passes the append role's connection (amendment 25 item 4).
     """
     if not path.exists():
         raise ChainError(f"import refused: {path} does not exist")
@@ -185,7 +210,7 @@ def import_file(dsn: str, path: Path) -> tuple[int, str] | None:
         # The file never enforced unique ids; the table's primary key does.
         raise ChainError("import refused: the file holds a duplicate event_id")
     try:
-        with _connect(dsn) as conn:
+        with _connect(params) as conn:
             _lock(conn)
             _replay(conn, records)
     except ChainError:

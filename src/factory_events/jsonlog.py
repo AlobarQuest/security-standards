@@ -1,8 +1,8 @@
 """Structured JSON log records on stdout for the database chain paths.
 
 ADR-0055 amendment 24 item 13: a record names the operation, its outcome, the event id,
-the `seq`, a prefix of the head hash and an error's type. Never pass a DSN, a password or a
-driver error's text: a connection error can repeat its DSN.
+the `seq`, a prefix of the head hash and an error's type. Never pass a password, a
+connection's parameters or a driver error's text: a connection error can repeat them.
 """
 
 import json
