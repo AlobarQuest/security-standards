@@ -171,7 +171,8 @@ def _cmd_adapt(args: argparse.Namespace) -> int:
 
 def _cmd_import_file(args: argparse.Namespace) -> int:
     try:
-        params = chain.connection_params(chain.APPEND_ROLE)  # amendment 25 item 4
+        # The one-time import runs as the append-only role (ADR-0055 amendment 25 item 4).
+        params = chain.connection_params(chain.APPEND_ROLE)
         head = db.import_file(params, Path(args.path).expanduser())
     except ChainError as exc:
         print(f"IMPORT FAIL: {exc}", file=sys.stderr)

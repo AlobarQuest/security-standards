@@ -19,7 +19,6 @@ SENTINEL = "sentinel-pw-7f3a9c"
 SETTINGS = {chain.DB_HOST_VAR: "127.0.0.1", chain.DB_NAME_VAR: "factory_events"}
 # Nothing listens on port 1, so the connection is refused at once.
 UNREACHABLE = {**SETTINGS, chain.DB_PORT_VAR: "1"}
-MALFORMED = {**SETTINGS, chain.DB_PORT_VAR: "notaport"}
 APPEND = {chain.APPEND_PASSWORD_VAR: SENTINEL, **UNREACHABLE}
 READ = {chain.READ_PASSWORD_VAR: SENTINEL, **UNREACHABLE}
 EMIT_ARGS = ["emit", "--actor", "devon", "--action", "test.ping", "--result", "success"]
@@ -119,6 +118,15 @@ def test_a_retired_variable_refuses_beside_a_password(monkeypatch, tmp_path, cap
     assert "FACTORY_EVENTS_IMPORT_DSN is retired" in err and SENTINEL not in err
 
 
+@pytest.mark.parametrize("port", ["notaport", "5545x", "-1"])
+def test_a_malformed_port_refuses_by_name(monkeypatch, capsys, port):
+    _setenv(monkeypatch, {**APPEND, chain.DB_PORT_VAR: port})
+    assert main(EMIT_ARGS) == 1
+    captured = capsys.readouterr()
+    assert "emit failed: FACTORY_EVENTS_DB_PORT is not a port number" in captured.err
+    assert SENTINEL not in captured.out + captured.err and port not in captured.err
+
+
 # --- mode selection --------------------------------------------------------------------
 
 
@@ -181,9 +189,8 @@ def test_read_password_alone_refuses_adapt(tmp_path, monkeypatch, capsys):
     assert not store.events_path().exists()
 
 
-@pytest.mark.parametrize("settings", [UNREACHABLE, MALFORMED], ids=["unreachable", "malformed"])
-def test_emit_failure_writes_nothing_and_never_prints_the_password(tmp_path, settings):
-    proc = _run_cli(EMIT_ARGS, {chain.APPEND_PASSWORD_VAR: SENTINEL, **settings}, tmp_path)
+def test_emit_failure_writes_nothing_and_never_prints_the_password(tmp_path):
+    proc = _run_cli(EMIT_ARGS, APPEND, tmp_path)
     assert proc.returncode == 1
     assert "emit failed: append failed" in proc.stderr
     assert SENTINEL not in proc.stdout + proc.stderr
@@ -193,10 +200,8 @@ def test_emit_failure_writes_nothing_and_never_prints_the_password(tmp_path, set
     assert record["op"] == "append" and record["outcome"] == "failure"
 
 
-@pytest.mark.parametrize("settings", [UNREACHABLE, MALFORMED], ids=["unreachable", "malformed"])
-def test_verify_failure_never_prints_the_password(tmp_path, settings):
-    env = {chain.READ_PASSWORD_VAR: SENTINEL, **settings}
-    proc = _run_cli(["verify", "--against-anchor"], env, tmp_path)
+def test_verify_failure_never_prints_the_password(tmp_path):
+    proc = _run_cli(["verify", "--against-anchor"], READ, tmp_path)
     assert proc.returncode == 1
     assert "VERIFY FAIL: verify failed" in proc.stderr
     assert SENTINEL not in proc.stdout + proc.stderr

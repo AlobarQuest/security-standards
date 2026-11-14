@@ -60,9 +60,12 @@ def connection_params(role: str) -> db.ConnectParams:
     """The connection for one role: its password and the three settings, each required."""
     _refuse_retired()
     password = _setting(_PASSWORD_VARS[role])
+    port = _setting(DB_PORT_VAR)
+    if not port.isdecimal():
+        raise db.ChainError(f"{DB_PORT_VAR} is not a port number")
     return db.ConnectParams(
         host=_setting(DB_HOST_VAR),
-        port=_setting(DB_PORT_VAR),
+        port=port,
         dbname=_setting(DB_NAME_VAR),
         user=role,
         password=password,
