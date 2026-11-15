@@ -98,8 +98,8 @@ def test_each_missing_setting_refuses_by_name(monkeypatch, capsys, missing, empt
 @pytest.mark.parametrize("retired", chain.RETIRED_VARS)
 @pytest.mark.parametrize(
     "args",
-    [EMIT_ARGS, ["verify"], ["ship"], ["adapt", "--source", "high-power"]],
-    ids=["emit", "verify", "ship", "adapt"],
+    [EMIT_ARGS, ["verify"], ["adapt", "--source", "high-power"]],
+    ids=["emit", "verify", "adapt"],
 )
 def test_a_set_retired_variable_refuses_every_command(tmp_path, monkeypatch, capsys, retired, args):
     """No password is set, so ignoring the retired variable would drop to the file chain."""
@@ -281,12 +281,6 @@ def test_corrupt_anchor_fails_verify_cleanly(monkeypatch, capsys):
     _setenv(monkeypatch, READ)
     assert main(["verify", "--against-anchor"]) == 1
     assert "VERIFY FAIL: the anchor at" in capsys.readouterr().err
-
-
-def test_ship_refuses_in_database_mode(monkeypatch, capsys):
-    _setenv(monkeypatch, APPEND)
-    assert main(["ship"]) == 1
-    assert "SHIP FAIL" in capsys.readouterr().err
 
 
 def test_anchor_round_trips(tmp_path):

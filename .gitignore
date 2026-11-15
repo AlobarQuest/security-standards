@@ -19,8 +19,5 @@ __pycache__/
 # provider-agent session state (stateful claude -p threads)
 .provider-agent/sessions/
 
-# factory-events local DB compose env (secrets)
-deploy/factory-events-db/.env
-
 # Build-session worktrees (see CLAUDE.md: build sessions get their own worktree).
 .worktrees/

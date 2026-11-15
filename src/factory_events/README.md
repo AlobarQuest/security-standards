@@ -22,11 +22,6 @@ writes or verifies a file since. Spec:
 - `verify [--against-anchor | --record-anchor]` — walk the database chain's
   hash links + schema-validate every event (see "Anchor" below for the flags).
   Refuses with `no chain password is set` when neither password is set.
-- `ship [--rebuild]` — upsert the pre-cut-over file into the Mac's Postgres
-  projection (`FACTORY_DB_DSN`) + record its head in `chain_heads`. `--rebuild`
-  truncates `factory_events` (never `chain_heads`) and replays. It refuses while
-  a chain password is set, and FE-6 retires it with that database.
-
 - `import-file --path FILE` — replay a verified events file, in order, into an
   empty database chain in one transaction; commits only if the imported head
   equals the file's head. Connects as the append role, from
@@ -110,7 +105,6 @@ authority model (ability / policy / task-authority / approval).
 ## Runtime config — `~/.factory/env` (chmod 600, never tracked)
 
     CM_BASE_URL=https://change-mgr.alobar.net
-    FACTORY_DB_DSN=postgresql://factory_events:<from BWS>@127.0.0.1:5545/factory_events  # ship only, until FE-6
     FACTORY_HC_PING_URL=<healthchecks.io ping url>  # optional
 
 `CM_M2M_TOKEN` isn't in this file. `scripts/factory-events-nightly.sh` fetches it from BWS
@@ -168,8 +162,7 @@ holder at once.
    database verify when it doesn't.
 4. Runs adapt all, then verify --record-anchor, which checks the anchor again and anchors the
    verified head.
-5. Pings success with the verify output. It never runs `ship`, so the run's
-   `chain:factory-events` observation reports `shipped` 0.
+5. Pings success with the verify output.
 
 The password and the three settings reach only the `python -m factory_events` children, as an
 assignment prefix on each command line: never exported, never in argv, never logged. The access

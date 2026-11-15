@@ -213,7 +213,10 @@ def test_file_absent_fails_by_name_and_runs_nothing(nightly: Nightly) -> None:
     assert nightly.calls("security") == []
     assert APPEND_SECRET_ID not in [c["argv"][2] for c in nightly.calls("bws")]
     assert "missing " + str(nightly.switch) in nightly.log.read_text()
-    assert nightly.facts()["shipped"] == "0"
+    facts = nightly.facts()
+    assert facts["anchor_verified"] == "false"
+    assert "shipped" not in facts
+    assert "head_seq" not in facts
 
 
 # ── Database mode: the switch file is present ─────────────────────────────────────────────
@@ -236,7 +239,8 @@ def test_file_present_verifies_adapts_and_records_the_anchor_without_ship(
     success = nightly.calls("curl")[-1]["argv"]
     assert "chain ok: 7 events, head stubhead" in success[success.index("--data-raw") + 1]
     facts = nightly.facts()
-    assert facts["shipped"] == "0"
+    assert "shipped" not in facts
+    assert "head_seq" not in facts
     assert facts["chain_events"] == "7"
     assert facts["anchor_verified"] == "true"
 
