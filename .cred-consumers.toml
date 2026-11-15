@@ -1,0 +1,47 @@
+# .cred-consumers.toml — WS-0.7 rotation-lane consumer inventory for the credentials
+# this repository's scripts read: the BWS machine token the factory-events nightly
+# (scripts/factory-events-nightly.sh) bootstraps with.
+#
+# Read by infraops-mcp-server's nightly security-drift run (src/security-drift/
+# cred-rotation.ts) once this file's absolute path is listed in
+# ~/.config/infra-drift/cred-consumers.list. Schema, consumer kinds and the strict
+# subset-TOML rules are documented in infraops-mcp-server/.cred-consumers.toml.
+# Complements .bws-secrets.toml: that file says which secrets this repo consumes;
+# this one says, per credential, what must be updated and verified on rotation.
+#
+# NO entry here carries consumers_verified: none has been fingerprint-swept. No entry is
+# rotated_by_sds, so each falls to the manual checklist (deny-by-default). Values NEVER
+# appear here: a credential is named only by its row id, Keychain item, and keeper UUID.
+#
+# The reader list comes from a grep of the token's Keychain item name across scripts/
+# and src/.
+
+version = 1
+
+# ── The Mac Keychain token the factory-events nightly reads (FE-5 plan follow-up 1) ──
+# Console-minted, hand-rotated. FE-5 act step 0 (D-54 A, 2026-11-15) wrote the Keychain item
+# from a BWS copy in Rotation / Keepers, which stays as the token's keeper copy; a hand rotation
+# updates both. sds-operator's temporary direct grant on the copy was removed the same day.
+# No `created` or fingerprint: a fingerprint needs a credentialed read, which stays with an
+# interactive session. Sibling rows bws-bump-proposer-token and bws-factory-events-session-token
+# live in orchestrator's .cred-consumers.toml.
+[[credential]]
+id = "bws-factory-events-nightly-token"
+class = "bws-machine-token"
+provider = "bitwarden-sm"
+provider_identity = "Bitwarden SM machine account factory-events-nightly (reads factory-events-append-password only)"
+disposition = "reissue"
+keeper_service = "Claude"
+keeper_account = "BWS_ACCESS_TOKEN_FACTORY_EVENTS_NIGHTLY"
+rotated_by_sds = false
+
+  [[credential.consumer]]
+  kind = "keychain"
+  service = "Claude"
+  account = "BWS_ACCESS_TOKEN_FACTORY_EVENTS_NIGHTLY"
+  note = "the keeper; scripts/factory-events-nightly.sh (deployed copy in ~/.claude/bin) reads it on each run, launchd com.devon.factory-events 03:30"
+
+  [[credential.consumer]]
+  kind = "bws-secret"
+  uuid = "4c1bcf0e-46f6-4ac3-9d3f-b50300d50015"
+  note = "bws-factory-events-nightly-token (Rotation / Keepers; sds-operator's temporary direct grant removed 2026-11-15) — BWS keeper copy, from which FE-5 act step 0 wrote the Keychain item (D-54 A, 2026-11-15); no launcher reads it"
