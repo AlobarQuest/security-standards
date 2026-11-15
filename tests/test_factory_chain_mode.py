@@ -1,6 +1,6 @@
-"""Which chain emit, adapt and verify use, without a database: the file chain stays as it was,
-a configured database fails closed by name, a password never reaches output, and emit's stdout
-stays within intent-packages' parse contract."""
+"""The database chain's settings, without a database: no password refuses and writes no file, a
+missing setting fails closed by name, a password never reaches output, and emit's stdout stays
+within intent-packages' parse contract."""
 
 import json
 import os
@@ -124,14 +124,62 @@ def test_a_retired_variable_refuses_beside_a_password(monkeypatch, tmp_path, cap
     assert "FACTORY_EVENTS_IMPORT_DSN is retired" in err and SENTINEL not in err
 
 
-# --- mode selection --------------------------------------------------------------------
+# --- no password, and which role verifies ----------------------------------------------
 
 
-def test_settings_without_a_password_stay_on_the_file_chain(monkeypatch):
+def test_emit_with_no_chain_variable_refuses_and_creates_no_file(tmp_path):
+    """FE-5 act step 11: no chain variable set, a scratch FACTORY_EVENTS_HOME, and emit refuses
+    without writing anything there."""
+    proc = _run_cli(EMIT_ARGS, {}, tmp_path)
+    assert proc.returncode == 1, proc.stdout
+    assert "emit failed: no chain password is set" in proc.stderr
+    assert not (tmp_path / "events.jsonl").exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_settings_without_a_password_refuse(monkeypatch, capsys):
     _setenv(monkeypatch, UNREACHABLE)
-    assert chain.database_mode() is False and chain.verify_params() is None
-    assert main(EMIT_ARGS) == 0
-    assert len(list(store.iter_records())) == 1
+    assert chain.database_mode() is False
+    for call in (chain.verify_params, chain.event_ids, lambda: chain.append_event(_event())):
+        with pytest.raises(db.ChainError, match="^no chain password is set$"):
+            call()
+    assert main(EMIT_ARGS) == 1
+    assert "emit failed: no chain password is set" in capsys.readouterr().err
+    assert not store.events_path().exists()
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [[], ["--against-anchor"], ["--record-anchor"]],
+    ids=["plain", "against-anchor", "record-anchor"],
+)
+def test_verify_with_no_chain_password_refuses(capsys, flags):
+    assert main(["verify", *flags]) == 1
+    assert "VERIFY FAIL: no chain password is set" in capsys.readouterr().err
+    assert not chain.anchor_path().exists()
+
+
+def test_adapt_with_no_chain_password_refuses_and_keeps_no_watermark(tmp_path, monkeypatch, capsys):
+    from factory_events.adapters import change_manager, high_power
+
+    source = tmp_path / "hp.jsonl"
+    source.write_text(
+        json.dumps({"tool": "Bash", "timestamp": "2026-07-03T01:00:00Z", "args_summary": "{}"})
+        + "\n"
+    )
+    monkeypatch.setattr(high_power, "DEFAULT_SOURCE", source)
+    assert main(["adapt", "--source", "high-power"]) == 1
+    assert "ADAPT FAIL (high-power): no chain password is set" in capsys.readouterr().err
+    with pytest.raises(db.ChainError, match="no chain password is set"):
+        change_manager.adapt(fetch=lambda after_id, limit: [])
+    assert not store.events_path().exists()
+    assert not store.state_dir().exists()
+
+
+def test_verify_no_longer_takes_tolerate_torn_tail(monkeypatch, capsys):
+    _setenv(monkeypatch, READ)
+    assert main(["verify", "--tolerate-torn-tail"]) == 1
+    assert "unrecognized arguments: --tolerate-torn-tail" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
@@ -142,25 +190,7 @@ def test_settings_without_a_password_stay_on_the_file_chain(monkeypatch):
 def test_verify_reads_under_the_read_password_else_the_append(monkeypatch, env, role):
     _setenv(monkeypatch, env)
     params = chain.verify_params()
-    assert params is not None and params.user == role
-
-
-def test_file_mode_emit_is_unchanged_and_never_loads_psycopg(tmp_path):
-    probe = (
-        "import sys; from factory_events.cli import main; rc = main(sys.argv[1:]); "
-        "assert 'psycopg' not in sys.modules, 'psycopg loaded'; sys.exit(rc)"
-    )
-    env = {k: v for k, v in os.environ.items() if not k.startswith("FACTORY_EVENTS_")}
-    env.update(PYTHONPATH=str(REPO / "src"), FACTORY_EVENTS_HOME=str(tmp_path))
-    proc = subprocess.run(
-        [sys.executable, "-c", probe, *EMIT_ARGS], capture_output=True, text=True, env=env
-    )
-    assert proc.returncode == 0, proc.stderr
-    # Today's stdout: the bare id, one line, nothing else.
-    lines = proc.stdout.splitlines()
-    assert len(lines) == 1 and lines[0].startswith("evt-")
-    assert [r["event"]["event_id"] for r in store.iter_records()] == [lines[0]]
-    assert parse_event_id(proc.stdout) == lines[0]
+    assert params.user == role
 
 
 def test_read_password_alone_refuses_emit_and_writes_no_file(monkeypatch, capsys):
@@ -222,17 +252,6 @@ def test_import_needs_the_append_password(tmp_path, monkeypatch, capsys):
     err = capsys.readouterr().err
     assert "IMPORT FAIL: FACTORY_EVENTS_APPEND_PASSWORD is not set" in err
     assert SENTINEL not in err
-
-
-def test_database_verify_rejects_file_only_flag(monkeypatch, capsys):
-    _setenv(monkeypatch, READ)
-    assert main(["verify", "--tolerate-torn-tail"]) == 1
-    assert "file chain only" in capsys.readouterr().err
-
-
-def test_file_verify_rejects_record_anchor(capsys):
-    assert main(["verify", "--record-anchor"]) == 1
-    assert "needs the database chain" in capsys.readouterr().err
 
 
 def test_emit_stdout_parses_when_json_logs_share_stdout(monkeypatch, capsys):

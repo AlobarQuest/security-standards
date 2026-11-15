@@ -5,7 +5,6 @@ from typing import Any
 import pytest
 
 from factory_events import envelope, ship, store
-from factory_events.cli import main
 
 DSN = os.environ.get("FACTORY_TEST_DSN")
 pytestmark = pytest.mark.integration
@@ -91,20 +90,3 @@ def test_ship_promotes_query_columns(pg):
             "SELECT actor, action, result, source_system FROM factory_events"
         ).fetchone()
     assert row == ("devon", "test.ping", "success", "direct")
-
-
-def test_verify_against_anchor_passes_and_fails(monkeypatch):
-    _seed(3)
-    head = store.head()
-    assert head is not None
-    seq, head_hash = head
-    monkeypatch.setattr(ship, "last_anchor", lambda dsn=None: (seq, head_hash))
-    assert main(["verify", "--against-anchor"]) == 0
-    monkeypatch.setattr(ship, "last_anchor", lambda dsn=None: (seq, "f" * 64))
-    assert main(["verify", "--against-anchor"]) == 1
-
-
-def test_verify_against_anchor_with_no_anchor_yet_passes(monkeypatch):
-    _seed(1)
-    monkeypatch.setattr(ship, "last_anchor", lambda dsn=None: None)
-    assert main(["verify", "--against-anchor"]) == 0

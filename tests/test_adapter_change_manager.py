@@ -1,12 +1,12 @@
 import pytest
 
-from factory_events import store
 from factory_events.adapters import change_manager
 from factory_events.adapters.change_manager import _map_actor
 
 
 @pytest.fixture(autouse=True)
-def _home(tmp_path, monkeypatch):
+def _home(tmp_path, monkeypatch, memory_chain):
+    """The cursor's state directory, and the chain each test reads back."""
     monkeypatch.setenv("FACTORY_EVENTS_HOME", str(tmp_path))
     yield tmp_path
 
@@ -36,11 +36,11 @@ def _fake_fetch(pages: dict[int, list[dict]]):
     return fetch
 
 
-def test_adapt_maps_fields_and_paginates():
+def test_adapt_maps_fields_and_paginates(memory_chain):
     pages = {0: [_raw(1), _raw(2, "approved", "devon@example.com")], 2: []}
     count = change_manager.adapt(fetch=_fake_fetch(pages))
     assert count == 2
-    records = list(store.iter_records())
+    records = memory_chain.records
     ev1, ev2 = records[0]["event"], records[1]["event"]
     assert ev1["action"] == "change.created"
     assert ev1["actor"] == "drift-reconciler"  # "sync" mapped
@@ -122,21 +122,21 @@ def test_every_classification_is_in_the_envelope_vocabulary():
         ("pr_linked", "unknown"),
     ],
 )
-def test_the_result_an_event_type_reaches_the_chain_with(event_type, expected):
+def test_the_result_an_event_type_reaches_the_chain_with(memory_chain, event_type, expected):
     pages = {0: [_raw(1, event_type, "executor")], 1: []}
     change_manager.adapt(fetch=_fake_fetch(pages))
-    [record] = list(store.iter_records())
+    [record] = memory_chain.records
     assert record["event"]["result"] == expected
 
 
-def test_a_type_the_map_does_not_know_is_recorded_as_unknown_rather_than_halting():
+def test_a_type_the_map_does_not_know_is_recorded_as_unknown_rather_than_halting(memory_chain):
     pages = {0: [_raw(1, "not_a_real_type", "executor")], 1: []}
     assert change_manager.adapt(fetch=_fake_fetch(pages)) == 1
-    [record] = list(store.iter_records())
+    [record] = memory_chain.records
     assert record["event"]["result"] == "unknown"
 
 
-def test_actor_and_result_mapping_table():
+def test_actor_and_result_mapping_table(memory_chain):
     pages = {
         0: [
             _raw(1, "attempt_done", "executor"),
@@ -148,7 +148,7 @@ def test_actor_and_result_mapping_table():
         5: [],
     }
     change_manager.adapt(fetch=_fake_fetch(pages))
-    events = [r["event"] for r in store.iter_records()]
+    events = memory_chain.events
     assert [e["actor"] for e in events] == [
         "change-window-agent",
         "change-window-agent",
@@ -176,10 +176,10 @@ def test_missing_config_fails_loudly(monkeypatch):
         change_manager.adapt()
 
 
-def test_normalize_ts_converts_non_utc_offsets():
+def test_normalize_ts_converts_non_utc_offsets(memory_chain):
     pages = {0: [dict(_raw(1), at="2026-07-01T04:00:00+05:00")], 1: []}
     change_manager.adapt(fetch=_fake_fetch(pages))
-    ev = list(store.iter_records())[0]["event"]
+    ev = memory_chain.events[0]
     assert ev["timestamp"] == "2026-06-30T23:00:00Z"
 
 

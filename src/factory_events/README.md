@@ -1,9 +1,10 @@
 # factory_events — common audit-event envelope (WS-1.1)
 
 One envelope (`factory-event/v1`, JSON Schema in `schema/`) across all factory
-systems; hash-chained append-only JSONL store at `~/.factory/events.jsonl`;
-nightly Postgres projection; and the Postgres chain of record that replaces the
-file once a role's password is set (see "The database chain"). Spec:
+systems, appended to the Postgres chain of record (see "The database chain").
+The chain began as a hash-chained JSONL file, `~/.factory/events.jsonl`; the
+FE-5 cut-over imported it into the database and sealed it, and no command
+writes or verifies a file since. Spec:
 `docs/superpowers/specs/2026-07-02-ws11-audit-event-envelope-design.md`.
 
 ## CLI
@@ -13,15 +14,18 @@ file once a role's password is set (see "The database chain"). Spec:
 - `emit --actor A --action x.y --result success|failure|unknown --ref NAME
   [--target T] [--correlation-id C] [--evidence-json '{...}']` — append one
   direct event. Runtimes/executors declare identity by emitting with their
-  registered actor id (validated against `registry/`).
+  registered actor id (validated against `registry/`). Refuses with
+  `no chain password is set` when neither password is set.
 - `adapt --source high-power|change-manager|all [--reanchor]` — translate
   source logs (watermarked, idempotent; `--reanchor` accepts a rewritten
   high-power source file and re-ingests with event_id dedupe).
-- `verify [--against-anchor]` — walk the hash chain + schema-validate every
-  event; `--against-anchor` also requires the last anchored head (chain_heads
-  in the projection) to still be present in the chain.
-- `ship [--rebuild]` — upsert into the projection + anchor the current head.
-  `--rebuild` truncates `factory_events` (never `chain_heads`) and replays.
+- `verify [--against-anchor | --record-anchor]` — walk the database chain's
+  hash links + schema-validate every event (see "Anchor" below for the flags).
+  Refuses with `no chain password is set` when neither password is set.
+- `ship [--rebuild]` — upsert the pre-cut-over file into the Mac's Postgres
+  projection (`FACTORY_DB_DSN`) + record its head in `chain_heads`. `--rebuild`
+  truncates `factory_events` (never `chain_heads`) and replays. It refuses while
+  a chain password is set, and FE-6 retires it with that database.
 
 - `import-file --path FILE` — replay a verified events file, in order, into an
   empty database chain in one transaction; commits only if the imported head
@@ -30,10 +34,10 @@ file once a role's password is set (see "The database chain"). Spec:
 
 ## The database chain (orchestrator ADR-0055 amendment 24)
 
-`emit`, `adapt` and `verify` use the Postgres chain of record when either
-role's password is set, and the file chain, exactly as before, when neither is.
-With either set, a command that lacks a setting it needs fails and names the
-variable; none falls back to the file. Each BWS secret holds only its role's
+`emit`, `adapt` and `verify` use the Postgres chain of record, and each refuses
+with `no chain password is set` when neither role's password is set. A command
+that lacks a setting it needs fails and names the variable. None of them falls
+back to a file. Each BWS secret holds only its role's
 password (orchestrator ADR-0055 amendment 26). `factory_events.chain` builds
 each connection from the password, the three settings and the role name, and
 passes them to psycopg as keyword parameters, never as a URL. Values come from
@@ -106,7 +110,7 @@ authority model (ability / policy / task-authority / approval).
 ## Runtime config — `~/.factory/env` (chmod 600, never tracked)
 
     CM_BASE_URL=https://change-mgr.alobar.net
-    FACTORY_DB_DSN=postgresql://factory_events:<from BWS>@127.0.0.1:5545/factory_events
+    FACTORY_DB_DSN=postgresql://factory_events:<from BWS>@127.0.0.1:5545/factory_events  # ship only, until FE-6
     FACTORY_HC_PING_URL=<healthchecks.io ping url>  # optional
 
 `CM_M2M_TOKEN` isn't in this file. `scripts/factory-events-nightly.sh` fetches it from BWS
@@ -117,22 +121,20 @@ it in that shell from BWS first.
 
 ## Recovery
 
-`~/.factory/` is in the nightly mini-host backup (dir tree; env EXCLUDED by policy —
-BWS is the secrets source of record). To recover: restore the tree from restic,
-re-materialize `~/.factory/env` from BWS per the config section (chmod 600), run
-`verify --tolerate-torn-tail` on the restored store (a mid-write copy may have one
-truncated final line — valid up to the last complete event).
-
-A torn final line must then be **removed** before the store accepts new work —
-`ship --rebuild`, `adapt`, and `emit` all use strict parsing and fail on a torn
-store. Repair it: keep only the first N complete lines (drop the trailing
-partial one), then re-run plain `verify` (no flag) — it must pass before
-resuming with `ship --rebuild`.
+The chain of record is the database, backed up with the other Coolify databases
+(vps-backup `backup.sh`). `~/.factory/` is in the nightly mini-host backup (dir
+tree; env EXCLUDED by policy — BWS is the secrets source of record). It holds the
+adapters' watermarks, the database chain's anchor (`state/chain-anchor.json`),
+and the sealed pre-cut-over file. To recover the Mac side: restore the tree from
+restic, re-materialize `~/.factory/env` from BWS per the config section
+(chmod 600), and run the nightly, whose first verify checks the restored anchor.
 
 ## Nightly
 
 `com.devon.factory-events` (launchd, 03:30) runs `scripts/factory-events-nightly.sh`, deployed
-to `~/.claude/bin/` by `make install`. The switch file `~/.factory/chain-db.env` picks its mode.
+to `~/.claude/bin/` by `make install`. It runs on the database chain, from the settings in
+`~/.factory/chain-db.env`. With no such file, it fails the run and pings `/fail`, naming the
+missing file; it runs no `factory_events` command and fetches no chain password.
 
 ### The switch file
 
@@ -151,30 +153,25 @@ names the line number and key, never a value.
 
 The staging copy `~/.factory/chain-db.env.pending` holds the same three lines. Only the
 orchestrator's session wrapper reads it, for the one-time `import-file`; the nightly never does.
-The FE-5 cut-over renames it to `chain-db.env` after the import, and that rename switches every
+The FE-5 cut-over renamed it to `chain-db.env` after the import, and that rename switched every
 holder at once.
 
-### File mode (`chain-db.env` absent)
-
-adapt all → verify --against-anchor → ship → healthcheck ping with the ship output. No chain
-variable is set, so every command uses the file chain.
-
-### Database mode (`chain-db.env` present)
+### The run
 
 1. Reads the three settings from the switch file.
 2. Reads the `factory-events-nightly` account's access token from Keychain `Claude` /
    `BWS_ACCESS_TOKEN_FACTORY_EVENTS_NIGHTLY`, and fetches `factory-events-append-password`
-   (see `.bws-secrets.toml`) with it. The change-manager bearer still comes through its own
-   identity, as in file mode.
+   (see `.bws-secrets.toml`) with it. The change-manager bearer comes through its own
+   identity.
 3. Runs verify --against-anchor, before anything appends: it checks
    `$FACTORY_EVENTS_HOME/state/chain-anchor.json` when that file exists, and is a plain
    database verify when it doesn't.
 4. Runs adapt all, then verify --record-anchor, which checks the anchor again and anchors the
    verified head.
-5. Skips ship, which refuses in database mode, and pings success with the verify output. The
-   run's `chain:factory-events` observation reports `shipped` 0.
+5. Pings success with the verify output. It never runs `ship`, so the run's
+   `chain:factory-events` observation reports `shipped` 0.
 
 The password and the three settings reach only the `python -m factory_events` children, as an
 assignment prefix on each command line: never exported, never in argv, never logged. The access
 token reaches only its `bws` process the same way. The script unsets the password after the
-last command. Any failed step fails the run through `fail`; nothing falls back to the file chain.
+last command. Any failed step fails the run through `fail`; nothing falls back to a file.
