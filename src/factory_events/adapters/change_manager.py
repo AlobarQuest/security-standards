@@ -1,4 +1,4 @@
-"""Adapter: change-manager /api/events -> factory-events store.
+"""Adapter: change-manager /api/events -> the factory-events database chain.
 
 Cursor = ChangeEvent.id (watermark {"last_id": N}); the endpoint is added by
 the WS-1.1 change-manager PR. Raw actor strings are preserved verbatim inside

@@ -1,4 +1,4 @@
-"""Adapter: ~/.claude/audit/high-power-actions.jsonl -> factory-events store.
+"""Adapter: ~/.claude/audit/high-power-actions.jsonl -> the factory-events database chain.
 
 Two record writers: (1) PostToolUse hook appends tool records {tool, timestamp, ...};
 (2) quality-gate.sh appends governance records {action, timestamp, ...}.
@@ -6,7 +6,7 @@ Two record writers: (1) PostToolUse hook appends tool records {tool, timestamp, 
 Watermark = {line_count, content_sha256} where content_sha256 hashes all processed
 lines — any rewrite in the ingested region is detected. A hash mismatch means the
 source was rewritten/rotated: fail loudly; --reanchor re-ingests from line 0 and the
-deterministic event_id (sha256 of the source line) dedupes against the store.
+deterministic event_id (sha256 of the source line) dedupes against the chain.
 Backfill scope is the live file only (spec §4 — .bak snapshots declined).
 """
 

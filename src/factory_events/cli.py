@@ -1,7 +1,8 @@
 """factory-events CLI: emit, verify, adapt, ship, import-file.
 
-emit, verify and adapt use the database chain when FACTORY_EVENTS_APPEND_PASSWORD or
-FACTORY_EVENTS_READ_PASSWORD is set (chain.py), and the file chain when neither is.
+emit, verify and adapt use the database chain, and refuse when neither
+FACTORY_EVENTS_APPEND_PASSWORD nor FACTORY_EVENTS_READ_PASSWORD is set (chain.py). import-file
+reads an events file as its input; ship projects the pre-cut-over file until FE-6 retires it.
 """
 
 import argparse
@@ -10,7 +11,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from factory_events import chain, db, store
+from factory_events import chain, db
 from factory_events.db import ChainError
 from factory_events.envelope import EnvelopeError, make_event
 
@@ -48,55 +49,9 @@ def _cmd_emit(args: argparse.Namespace) -> int:
 
 
 def _cmd_verify(args: argparse.Namespace) -> int:
-    try:
-        params = chain.verify_params()
-    except ChainError as exc:
-        print(f"VERIFY FAIL: {exc}", file=sys.stderr)
-        return 1
-    if params:
-        return _verify_database(params, args)
-    if getattr(args, "record_anchor", False):
-        print("VERIFY FAIL: --record-anchor needs the database chain", file=sys.stderr)
-        return 1
-    tolerate_torn_tail = getattr(args, "tolerate_torn_tail", False)
-    errors = store.verify_chain(tolerate_torn_tail=tolerate_torn_tail)
-    if errors:
-        for err in errors:
-            print(f"VERIFY FAIL: {err}", file=sys.stderr)
-        return 1
-    records = store.parsed_records(tolerate_torn_tail=tolerate_torn_tail)
-    current = (records[-1]["seq"], records[-1]["hash"]) if records else None
-    if getattr(args, "against_anchor", False):
-        from factory_events import ship as ship_mod
-
-        anchor = ship_mod.last_anchor()
-        if anchor is not None:
-            seqs = {rec["seq"]: rec["hash"] for rec in records}
-            if seqs.get(anchor[0]) != anchor[1]:
-                print(
-                    f"VERIFY FAIL: anchored head (seq {anchor[0]}) not in chain — "
-                    "store rewritten since last anchor",
-                    file=sys.stderr,
-                )
-                return 1
-            print(f"anchor ok: seq {anchor[0]} present")
-    _print_chain_ok(current)
-    return 0
-
-
-def _print_chain_ok(current: tuple[int, str] | None) -> None:
-    print(
-        f"chain ok: {current[0] if current else 0} events"
-        + (f", head {current[1]}" if current else "")
-    )
-
-
-def _verify_database(params: db.ConnectParams, args: argparse.Namespace) -> int:
-    if getattr(args, "tolerate_torn_tail", False):
-        print("VERIFY FAIL: --tolerate-torn-tail applies to the file chain only", file=sys.stderr)
-        return 1
     record_anchor = getattr(args, "record_anchor", False)
     try:
+        params = chain.verify_params()
         anchor = chain.read_anchor() if args.against_anchor or record_anchor else None
         result = db.verify(params, anchor_seq=anchor[0] if anchor else None)
     except ChainError as exc:
@@ -121,6 +76,13 @@ def _verify_database(params: db.ConnectParams, args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_chain_ok(current: tuple[int, str] | None) -> None:
+    print(
+        f"chain ok: {current[0] if current else 0} events"
+        + (f", head {current[1]}" if current else "")
+    )
+
+
 def _cmd_ship(args: argparse.Namespace) -> int:
     try:
         database_mode = chain.database_mode()
@@ -128,9 +90,9 @@ def _cmd_ship(args: argparse.Namespace) -> int:
         print(f"SHIP FAIL: {exc}", file=sys.stderr)
         return 1
     if database_mode:
-        # The file isn't the chain in database mode; projecting it would ship a stale copy.
+        # With a password set, the database is the chain; the file ship projects is a stale copy.
         print(
-            "SHIP FAIL: ship projects the file chain, and a chain password is set",
+            "SHIP FAIL: ship projects the pre-cut-over file, and a chain password is set",
             file=sys.stderr,
         )
         return 1
@@ -185,7 +147,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="factory_events")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    emit = sub.add_parser("emit", help="append one direct event to the store")
+    emit = sub.add_parser("emit", help="append one direct event to the database chain")
     emit.add_argument("--actor", required=True)
     emit.add_argument("--action", required=True)
     emit.add_argument("--result", required=True, choices=["success", "failure", "unknown"])
@@ -200,26 +162,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     emit.set_defaults(func=_cmd_emit)
 
-    verify = sub.add_parser("verify", help="verify the full hash chain + schemas")
+    verify = sub.add_parser("verify", help="verify the database chain's hash links + schemas")
     verify.add_argument("--against-anchor", action="store_true")
-    verify.add_argument(
-        "--tolerate-torn-tail",
-        action="store_true",
-        help="accept one truncated final line (restored-copy verification)",
-    )
     verify.add_argument(
         "--record-anchor",
         action="store_true",
-        help="database chain: check the anchor, then anchor the verified head",
+        help="check the anchor, then anchor the verified head",
     )
     verify.set_defaults(func=_cmd_verify)
 
-    adapt = sub.add_parser("adapt", help="translate source logs into the store")
+    adapt = sub.add_parser("adapt", help="translate source logs into the database chain")
     adapt.add_argument("--source", required=True, choices=["high-power", "change-manager", "all"])
     adapt.add_argument("--reanchor", action="store_true")
     adapt.set_defaults(func=_cmd_adapt)
 
-    ship_cmd = sub.add_parser("ship", help="upsert events into the Postgres projection")
+    ship_cmd = sub.add_parser(
+        "ship", help="upsert the pre-cut-over file's events into the Postgres projection"
+    )
     ship_cmd.add_argument(
         "--rebuild",
         action="store_true",

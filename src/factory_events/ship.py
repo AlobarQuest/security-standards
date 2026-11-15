@@ -1,8 +1,8 @@
-"""Ship the JSONL store to the local Postgres projection + anchor the head.
+"""Ship the pre-cut-over JSONL file to the local Postgres projection + anchor its head.
 
-The projection is disposable (--rebuild replays the JSONL). chain_heads is the
-tamper-evidence anchor: --rebuild NEVER touches it, and verify --against-anchor
-checks the chain still contains the last anchored (seq, head_hash).
+The projection is disposable (--rebuild replays the JSONL). chain_heads records each
+shipped head: --rebuild NEVER touches it. Since FE-5 no verify reads it; the database
+chain's anchor is chain.py's. FE-6 retires this module with the Mac database.
 """
 
 import os

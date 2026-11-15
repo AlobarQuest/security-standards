@@ -6,7 +6,7 @@ chain_schema.sql holds the table, its triggers and its two roles; this module ru
 Every failure surfaces as ChainError, whose text names only the operation and the error's
 type: a driver error's text can repeat connection details, so it's never logged, printed or
 chained.
-psycopg is imported lazily, so the file chain never loads it.
+psycopg is imported lazily, so a command that refuses before connecting never loads it.
 """
 
 import json
@@ -62,7 +62,7 @@ class ConnectParams:
 
 
 def _connect(params: ConnectParams) -> Any:
-    import psycopg  # lazy: the file chain must not require it
+    import psycopg  # lazy: a command that refuses before connecting never loads it
 
     return psycopg.connect(
         host=params.host,

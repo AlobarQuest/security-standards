@@ -2,17 +2,17 @@ import json
 
 import pytest
 
-from factory_events import store
 from factory_events.cli import main
 
 
 @pytest.fixture(autouse=True)
 def _home(tmp_path, monkeypatch):
+    """The state directory: the adapters' watermarks and the anchor."""
     monkeypatch.setenv("FACTORY_EVENTS_HOME", str(tmp_path))
     yield tmp_path
 
 
-def test_emit_appends_valid_event(capsys):
+def test_emit_appends_valid_event(capsys, memory_chain):
     rc = main(
         [
             "emit",
@@ -29,12 +29,11 @@ def test_emit_appends_valid_event(capsys):
     assert rc == 0
     out = capsys.readouterr().out.strip()
     assert out.startswith("evt-")
-    head = store.head()
-    assert head is not None
-    assert head[0] == 1
+    [record] = memory_chain.records
+    assert record["seq"] == 1 and record["event"]["event_id"] == out
 
 
-def test_emit_json_payload(capsys):
+def test_emit_json_payload(memory_chain):
     payload = json.dumps({"note": "hello"})
     rc = main(
         [
@@ -52,12 +51,10 @@ def test_emit_json_payload(capsys):
         ]
     )
     assert rc == 0
-    rec = list(store.iter_records())[0]
-    assert rec is not None
-    assert rec["event"]["evidence"] == [{"note": "hello"}]
+    assert memory_chain.events[0]["evidence"] == [{"note": "hello"}]
 
 
-def test_emit_rejects_bad_action(capsys):
+def test_emit_rejects_bad_action(memory_chain):
     rc = main(
         [
             "emit",
@@ -72,28 +69,7 @@ def test_emit_rejects_bad_action(capsys):
         ]
     )
     assert rc == 1
-
-
-def test_verify_ok_and_failure(capsys, tmp_path):
-    main(
-        [
-            "emit",
-            "--actor",
-            "devon",
-            "--action",
-            "factory.bootstrap",
-            "--result",
-            "success",
-            "--ref",
-            "manual",
-        ]
-    )
-    assert main(["verify"]) == 0
-    path = store.events_path()
-    line = json.loads(path.read_text())
-    line["event"]["actor"] = "mallory"
-    path.write_text(json.dumps(line) + "\n")
-    assert main(["verify"]) == 1
+    assert memory_chain.records == []
 
 
 def test_usage_error_exits_1(capsys):
@@ -117,29 +93,7 @@ def test_help_exits_0(capsys):
     assert main(["--help"]) == 0
 
 
-def test_verify_tolerate_torn_tail_cli_path(capsys):
-    main(
-        [
-            "emit",
-            "--actor",
-            "devon",
-            "--action",
-            "factory.bootstrap",
-            "--result",
-            "success",
-            "--ref",
-            "manual",
-        ]
-    )
-    from factory_events import store
-
-    with store.events_path().open("a") as fh:
-        fh.write('{"seq": 2, "prev_hash": "abc", "ha')
-    assert main(["verify"]) == 1
-    assert main(["verify", "--tolerate-torn-tail"]) == 0
-
-
-def test_adapt_high_power_via_cli(tmp_path, monkeypatch, capsys):
+def test_adapt_high_power_via_cli(tmp_path, monkeypatch, capsys, memory_chain):
     src = tmp_path / "hp.jsonl"
     record = {
         "timestamp": "2026-07-02T23:33:35Z",
@@ -154,3 +108,4 @@ def test_adapt_high_power_via_cli(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(high_power, "DEFAULT_SOURCE", src)
     assert main(["adapt", "--source", "high-power"]) == 0
     assert "1 events appended" in capsys.readouterr().out
+    assert [event["action"] for event in memory_chain.events] == ["tool.vps_exec"]

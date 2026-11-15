@@ -19,7 +19,7 @@ SCHEMA_SQL = Path(__file__).with_name("chain_schema.sql")
 
 
 def setup(owner_dsn: str) -> None:
-    import psycopg  # lazy: the file chain must not require it
+    import psycopg  # lazy: importing this module needs no driver
 
     with psycopg.connect(owner_dsn, connect_timeout=10, application_name="factory_events") as conn:
         conn.execute(SCHEMA_SQL.read_bytes())  # one transaction: committed on a clean exit

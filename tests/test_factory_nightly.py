@@ -1,4 +1,5 @@
-"""Controls for `scripts/factory-events-nightly.sh`: its file mode and its database mode.
+"""Controls for `scripts/factory-events-nightly.sh` on the database chain, and its refusal with
+no switch file.
 
 The nightly runs against stubs only: `security`, `bws`, `curl`, the venv's `python -m
 factory_events`, and the observation helper. Each stub records its argv and the chain variables
@@ -95,8 +96,6 @@ elif tool == "python":
         if "--against-anchor" in argv or "--record-anchor" in argv:
             print("anchor ok: seq 4 present")
         print("chain ok: 7 events, head stubhead")
-    elif command == "ship":
-        print("shipped=3 head_seq=7 head=stubhead")
 """
 
 OBSERVE_STUB = """\
@@ -203,30 +202,18 @@ def assert_failed(nightly: Nightly, result: subprocess.CompletedProcess[str]) ->
     assert nightly.pings()[-1] == f"{PING_URL}/fail"
 
 
-# ── File mode: no switch file ─────────────────────────────────────────────────────────────
+# ── No switch file: the run fails ─────────────────────────────────────────────────────────
 
 
-def test_file_absent_runs_adapt_verify_ship_as_before(nightly: Nightly) -> None:
+def test_file_absent_fails_by_name_and_runs_nothing(nightly: Nightly) -> None:
     result = nightly.run()
 
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert nightly.commands() == [
-        ["adapt", "--source", "all"],
-        ["verify", "--against-anchor"],
-        ["ship"],
-    ]
-    assert nightly.pings() == [f"{PING_URL}/start", PING_URL]
-    assert nightly.facts()["shipped"] == "3"
-
-
-def test_file_absent_fetches_nothing_through_the_nightly_item(nightly: Nightly) -> None:
-    nightly.run()
-
+    assert_failed(nightly, result)
+    assert nightly.commands() == []
     assert nightly.calls("security") == []
-    bws = nightly.calls("bws")
-    assert [c["argv"][2] for c in bws] == [CM_SECRET_ID]
-    assert bws[0]["bws_token"] == STUB_BROAD
-    assert all(c["chain"] == {} for c in nightly.calls())
+    assert APPEND_SECRET_ID not in [c["argv"][2] for c in nightly.calls("bws")]
+    assert "missing " + str(nightly.switch) in nightly.log.read_text()
+    assert nightly.facts()["shipped"] == "0"
 
 
 # ── Database mode: the switch file is present ─────────────────────────────────────────────

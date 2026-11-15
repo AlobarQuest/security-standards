@@ -1,8 +1,8 @@
-"""Which chain a command uses: the database when a role's password is set, else the file.
+"""The database chain's connections, built from a role's password and three settings.
 
-With neither password set, every function here is the file store's, unchanged. With either set,
-the database is the chain, and a command missing a setting it needs fails closed: it never
-falls back to the file (orchestrator ADR-0055 amendment 24 items 7, 8 and 10).
+The database is the only chain emit, adapt and verify use. With neither password set, each of
+them refuses; a command missing a setting it needs fails closed too. None of them falls back to
+the file (orchestrator ADR-0055 amendment 24 items 7, 8 and 10; FE-5 removed the file path).
 
 Each BWS secret holds only its role's password; the address is plain configuration, and this
 module builds each connection from those parts (amendment 26). It never formats a URL, so no
@@ -23,8 +23,8 @@ DB_NAME_VAR = "FACTORY_EVENTS_DB_NAME"
 # role the schema didn't create.
 APPEND_ROLE = "factory_events_append"
 READ_ROLE = "factory_events_read"
-# Whole-DSN variables, retired by amendment 26. A set one refuses: ignoring it would drop that
-# process to the file chain without a word.
+# Whole-DSN variables, retired by amendment 26. A set one refuses, so a holder still configured
+# the old way learns it by name rather than from a missing password.
 RETIRED_VARS = (
     "FACTORY_EVENTS_APPEND_DSN",
     "FACTORY_EVENTS_READ_DSN",
@@ -49,6 +49,11 @@ def database_mode() -> bool:
     return bool(_env(APPEND_PASSWORD_VAR) or _env(READ_PASSWORD_VAR))
 
 
+def _require_password() -> None:
+    if not database_mode():
+        raise db.ChainError("no chain password is set")
+
+
 def _setting(name: str) -> str:
     value = _env(name)
     if not value:
@@ -69,23 +74,20 @@ def connection_params(role: str) -> db.ConnectParams:
     )
 
 
-def verify_params() -> db.ConnectParams | None:
+def verify_params() -> db.ConnectParams:
     """The connection a verify reads under: the read role's, else the append role's (the
-    nightly holds only the append password, and its role can SELECT). None in file mode."""
-    if not database_mode():
-        return None
+    nightly holds only the append password, and its role can SELECT)."""
+    _require_password()
     return connection_params(READ_ROLE if _env(READ_PASSWORD_VAR) else APPEND_ROLE)
 
 
 def append_event(event: dict) -> dict:
-    if not database_mode():
-        return store.append_event(event)
+    _require_password()
     return db.append_event(connection_params(APPEND_ROLE), event)
 
 
 def event_ids() -> set[str]:
-    if not database_mode():
-        return store.event_ids()
+    _require_password()
     return db.event_ids(connection_params(APPEND_ROLE))
 
 

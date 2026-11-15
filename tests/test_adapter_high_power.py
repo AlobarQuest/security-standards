@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from factory_events import store
 from factory_events.adapters import high_power
 
 FIXTURE = Path(__file__).parent / "fixtures" / "high_power_sample.jsonl"
@@ -12,7 +11,8 @@ PROVENANCE = "unknown (confirm at review: direct request vs inferred from read c
 
 
 @pytest.fixture(autouse=True)
-def _home(tmp_path, monkeypatch):
+def _home(tmp_path, monkeypatch, memory_chain):
+    """The watermark's state directory, and the chain each test reads back."""
     monkeypatch.setenv("FACTORY_EVENTS_HOME", str(tmp_path / "factory"))
     yield tmp_path
 
@@ -24,19 +24,18 @@ def source(tmp_path) -> Path:
     return src
 
 
-def adapt_lines(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lines: list[str]) -> list[dict]:
-    """Write raw JSONL lines to a tmp source, adapt them, and return the stored events."""
+def adapt_lines(tmp_path: Path, memory_chain, lines: list[str]) -> list[dict]:
+    """Write raw JSONL lines to a tmp source, adapt them, and return the appended events."""
     src = tmp_path / "adapt_lines_src.jsonl"
     src.write_text("\n".join(lines) + "\n")
-    monkeypatch.setenv("FACTORY_EVENTS_HOME", str(tmp_path / "factory_adapt_lines"))
     high_power.adapt(source=src)
-    return [record["event"] for record in store.iter_records()]
+    return memory_chain.events
 
 
-def test_adapt_maps_fields(source):
+def test_adapt_maps_fields(source, memory_chain):
     count = high_power.adapt(source=source)
     assert count == 3
-    records = list(store.iter_records())
+    records = memory_chain.records
     ev = records[0]["event"]
     assert ev["action"] == "tool.vps_exec"
     assert ev["actor"] == "claude-code-unattributed"
@@ -50,7 +49,7 @@ def test_adapt_maps_fields(source):
     assert records[2]["event"]["action"] == "tool.gmail__send"
 
 
-def test_adapt_is_incremental_and_idempotent(source):
+def test_adapt_is_incremental_and_idempotent(source, memory_chain):
     assert high_power.adapt(source=source) == 3
     assert high_power.adapt(source=source) == 0  # nothing new
     with source.open("a") as fh:
@@ -67,7 +66,7 @@ def test_adapt_is_incremental_and_idempotent(source):
             + "\n"
         )
     assert high_power.adapt(source=source) == 1
-    assert len(store.event_ids()) == 4
+    assert len(memory_chain.records) == 4
 
 
 def test_rewritten_source_raises_without_reanchor(source):
@@ -79,7 +78,7 @@ def test_rewritten_source_raises_without_reanchor(source):
         high_power.adapt(source=source)
 
 
-def test_reanchor_reingests_with_dedupe(source):
+def test_reanchor_reingests_with_dedupe(source, memory_chain):
     high_power.adapt(source=source)
     lines = source.read_text().splitlines()
     lines[0] = lines[0].replace("docker ps", "docker kill")
@@ -87,7 +86,7 @@ def test_reanchor_reingests_with_dedupe(source):
     count = high_power.adapt(source=source, reanchor=True)
     # only the rewritten line is new (different raw line -> different event_id)
     assert count == 1
-    assert len(store.event_ids()) == 4
+    assert len(memory_chain.records) == 4
 
 
 def test_truncated_source_raises(source):
@@ -97,14 +96,14 @@ def test_truncated_source_raises(source):
         high_power.adapt(source=source)
 
 
-def test_malformed_source_line_raises_source_error_and_keeps_watermark(source):
+def test_malformed_source_line_raises_source_error_and_keeps_watermark(source, memory_chain):
     high_power.adapt(source=source)
     with source.open("a") as fh:
         fh.write("{not json\n")
     with pytest.raises(high_power.SourceError):
         high_power.adapt(source=source)
     # watermark untouched by the failed run: fixing the file resumes cleanly
-    assert len(store.event_ids()) == 3
+    assert len(memory_chain.records) == 3
 
 
 def test_cli_reports_source_error(tmp_path, monkeypatch, capsys):
@@ -117,7 +116,7 @@ def test_cli_reports_source_error(tmp_path, monkeypatch, capsys):
     assert "ADAPT FAIL (high-power)" in capsys.readouterr().err
 
 
-def test_governance_bypass_record_maps(source):
+def test_governance_bypass_record_maps(source, memory_chain):
     with source.open("a") as fh:
         fh.write(
             json.dumps(
@@ -132,7 +131,7 @@ def test_governance_bypass_record_maps(source):
         )
     count = high_power.adapt(source=source)
     assert count == 4
-    ev = list(store.iter_records())[-1]["event"]
+    ev = memory_chain.events[-1]
     assert ev["action"] == "governance.code-standards-bypass"
     assert ev["target"] == "/Users/devon/Projects/x"
     assert ev["result"] == "success"
@@ -146,7 +145,7 @@ def test_record_with_neither_tool_nor_action_raises(source):
         high_power.adapt(source=source)
 
 
-def test_stamped_registered_actor_is_used(tmp_path, monkeypatch):
+def test_stamped_registered_actor_is_used(tmp_path, memory_chain):
     line = json.dumps(
         {
             "timestamp": "2026-07-03T04:00:00Z",
@@ -157,11 +156,11 @@ def test_stamped_registered_actor_is_used(tmp_path, monkeypatch):
             "provenance": "unknown",
         }
     )
-    events = adapt_lines(tmp_path, monkeypatch, [line])
+    events = adapt_lines(tmp_path, memory_chain, [line])
     assert events[0]["actor"] == "vps-backup-provider-agent"
 
 
-def test_stamped_unregistered_actor_falls_back(tmp_path, monkeypatch):
+def test_stamped_unregistered_actor_falls_back(tmp_path, memory_chain):
     line = json.dumps(
         {
             "timestamp": "2026-07-03T04:00:00Z",
@@ -172,12 +171,12 @@ def test_stamped_unregistered_actor_falls_back(tmp_path, monkeypatch):
             "provenance": "unknown",
         }
     )
-    events = adapt_lines(tmp_path, monkeypatch, [line])
+    events = adapt_lines(tmp_path, memory_chain, [line])
     assert events[0]["actor"] == "claude-code-unattributed"
     assert events[0]["evidence"][0]["record"]["actor"] == "typo-agent"  # raw preserved
 
 
-def test_unstamped_record_falls_back(tmp_path, monkeypatch):
+def test_unstamped_record_falls_back(tmp_path, memory_chain):
     line = json.dumps(
         {
             "timestamp": "2026-07-03T04:00:00Z",
@@ -187,5 +186,5 @@ def test_unstamped_record_falls_back(tmp_path, monkeypatch):
             "provenance": "unknown",
         }
     )
-    events = adapt_lines(tmp_path, monkeypatch, [line])
+    events = adapt_lines(tmp_path, memory_chain, [line])
     assert events[0]["actor"] == "claude-code-unattributed"
