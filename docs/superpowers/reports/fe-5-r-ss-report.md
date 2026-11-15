@@ -95,7 +95,7 @@ So I found no unnamed caller that breaks, and I wrote no question file.
 | --- | --- | --- | --- |
 | `make check` (ruff, ruff format, pyright, shellcheck, pytest) | 268 collected, 268 passed, 27 deselected | 268 collected, 268 passed, 25 deselected | Green both times |
 | `make check-integration` (throwaway `postgres:16-alpine` container) | 27 passed | 25 passed | Green both times |
-| Security scanner (`security_scan.cli . --category security`) | — | Exit 0; WARN and INFO only, all in files this PR doesn't touch | No BLOCK |
+| Security scanner (`security_scan.cli . --category security`) | — | Exit 0. Findings are WARN and INFO, plus one allowlisted BLOCK (`hooks/bws-write-guard.sh` line 33). All are in files this PR doesn't touch | No active BLOCK |
 
 The counts come from the pytest summary lines. I compared the before and after node-ID lists
 (`pytest --collect-only`) with `comm`.
@@ -129,7 +129,7 @@ All checks on PR #95 at `c4419e2` passed. I read the following counts from the j
   step passed.
 
 The `push` event triggered a duplicate Quality run and a duplicate Security Scan run (43661736579
-and 43661736577). Both passed.
+and 43661736577). Both passed. The commits after `c4419e2` change only this report.
 
 ### Removed tests
 
@@ -138,7 +138,7 @@ The following tests were removed, each with what replaces its coverage.
 | Test | Why it went | Where its coverage is now |
 | --- | --- | --- |
 | `test_factory_chain_mode.py::test_settings_without_a_password_stay_on_the_file_chain` | It asserted the file fallback this PR removes. | Replaced by `test_settings_without_a_password_refuse`, which uses the same settings and asserts the refusal. |
-| `test_factory_chain_mode.py::test_file_mode_emit_is_unchanged_and_never_loads_psycopg` | It asserted that file-mode `emit` succeeds. | The stdout parse contract stays covered by `test_emit_stdout_parses_when_json_logs_share_stdout` (unit) and `test_factory_db.py::test_emit_stdout_parses_to_the_emitted_id` (integration). The subprocess `emit` path is covered by the act-step-11 test. |
+| `test_factory_chain_mode.py::test_file_mode_emit_is_unchanged_and_never_loads_psycopg` | It asserted that file-mode `emit` succeeds. | The stdout parse contract stays covered by `test_emit_stdout_parses_when_json_logs_share_stdout` (unit) and `test_factory_db.py::test_emit_stdout_parses_to_the_emitted_id` (integration). The subprocess `emit` path is covered by the act-step-11 test. Its other assertion, that `emit` never loads psycopg, has no successor: no test checks that a refusal stays psycopg-free. |
 | `test_factory_chain_mode.py::test_database_verify_rejects_file_only_flag` | The flag it rejected no longer exists. | Replaced by `test_verify_no_longer_takes_tolerate_torn_tail`, which asserts a usage error. |
 | `test_factory_chain_mode.py::test_file_verify_rejects_record_anchor` | File-mode `verify` no longer exists. | Replaced by `test_verify_with_no_chain_password_refuses[plain, against-anchor, record-anchor]`. |
 | `test_factory_cli.py::test_verify_ok_and_failure` | It tested file-mode `verify` passing, then failing on a tampered line. | Tamper detection on the database chain: `test_factory_db.py::test_verify_finds_a_tampered_row`. The same walk over a file: `test_factory_store.py`'s `walk_records` tests, unchanged. |
@@ -164,7 +164,7 @@ All the added tests are in `tests/test_factory_chain_mode.py`, except the last.
 
 ### Moved tests (same node IDs, different chain)
 
-- **Adapter tests:** all 13 in `test_adapter_high_power.py` and all 23 in
+- **Adapter tests:** all 12 in `test_adapter_high_power.py` and all 24 in
   `test_adapter_change_manager.py` keep their names and assertions. They read the events back from
   `memory_chain`, not `store.iter_records()`. They stay in CI's collected set, because no CI job
   needs Postgres for them.
@@ -208,8 +208,10 @@ I ran `/code-review` at high effort on `237e422..HEAD`. I acted on its findings 
    `test_factory_ship.py` calls it. These could go in FE-6 along with `ship`.
 2. **No command verifies a file by itself any more.** The README's recovery steps used
    `verify --tolerate-torn-tail` on a restored `events.jsonl`. After this PR, the only file check
-   is inside `import-file`, which refuses an unparseable or broken file. The sealed file's
-   integrity check then rests on step 4's `shasum` and P-VB's backup check.
+   is inside `import-file`, which refuses an unparseable or broken file. After the act, the sealed
+   file's integrity rests on the SHA-256 that steps 4 and 7 record. The plan describes P-VB's
+   backup check as confirming that the restored snapshot holds the sealed file, not as verifying
+   its chain.
 3. **`ship` without a password still runs.** Until FE-6, `ship` in a shell with no password
    projects whatever `events.jsonl` holds. After the seal the file is absent, so `ship` inserts
    nothing, and `ship --rebuild` truncates the projection's `factory_events` (never
@@ -250,7 +252,8 @@ I ran `/code-review` at high effort on `237e422..HEAD`. I acted on its findings 
   `test_file_present_keeps_the_password_and_token_out_of_argv_and_the_log`. The fake's password
   in `conftest.py` is a placeholder string.
 - **Infra Brain 591, 592, and 593 (no BWS token in tracked files, no inline `BWS_ACCESS_TOKEN`).**
-  No token or token-shaped value was added. The scanner exits 0 with no BLOCK finding. The only
+  No token or token-shaped value was added. The scanner exits 0. Its only BLOCK is allowlisted, in
+  `hooks/bws-write-guard.sh`, which this PR doesn't touch. The only
   UUID touched is the existing append-secret ID, in an existing comment.
 - **Infra Brain 1032 (a credential seen in a transcript is exposed).** No credential appeared in
   this session. I didn't run `bws`, read the Keychain, or connect to the VPS database. The
