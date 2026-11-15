@@ -4,8 +4,10 @@ Outcome: done
 
 - **PR:** https://github.com/AlobarQuest/security-standards/pull/96 (not merged), branch
   `hq/nightly-token-registry-row`, base `main` at `e905304`.
-- **Head:** `dde5a93` holds the registry file. This report is committed on top of it, so the PR's
-  final head is the report commit.
+- **Head:** `dde5a93` holds the registry file. The report commits follow it (the first was
+  `679c87b`); the PR's final head is the last report commit, one past the head named in it.
+- **CI on PR #96 (at `679c87b`):** all five checks passed: two lint, type-check, and test jobs,
+  two `scan` jobs, and the factory-store integration tests.
 
 ## What I built
 
@@ -56,6 +58,16 @@ handoff:
 
 ## Parser check
 
+The infraops parser is permissive. `parseCredConsumers` accepts any key and any consumer `kind`
+string; it validates only string `id`/`class`, a boolean `rotated_by_sds`, a non-empty consumer
+`kind`, and unique ids. So "it parses" doesn't show the kinds are right. What confirms them:
+
+- The schema comment in infraops `.cred-consumers.toml` (lines 12-13) documents
+  `bws-secret { uuid }` and `keychain { service, account }`. The row uses exactly those fields.
+- `git grep` of infraops `src/` at `c3359bf` finds no code that reads a consumer's `kind` beyond
+  the non-empty check (`cred-consumers.ts` line 214). Consumer kinds are documentation for the
+  manual checklist, and both match the siblings.
+
 All of the following checks passed:
 
 1. **infraops parser.** I extracted infraops-mcp-server `origin/main` (`c3359bf`) with
@@ -70,7 +82,9 @@ All of the following checks passed:
    with the new file: 53 credentials, and no `duplicate credential id ... across files` error.
 3. **Rotation policy.** `bws-machine-token` is in `CLASS_POLICY` (`cred-rotation.ts` line 88,
    365-day max age). `credFindings` on the row, with an empty rotation state, returns no findings,
-   so there's no `cred.unknown-class` warning.
+   so there's no `cred.unknown-class` warning. `buildCredClassifications` builds the row's five
+   classifications without error, and `scanFindings` over the full 53-credential set returns
+   nothing for the row.
 4. **tomllib.** Python 3.14.3 `tomllib` parses the file: `version` 1, one credential, consumer
    kinds `keychain` and `bws-secret`.
 
@@ -96,8 +110,8 @@ Until the PR merges, that path doesn't exist. A listed file that can't be read t
 - `make check` (exit 0): ruff check passed, ruff format found 66 files already formatted, pyright
   reported 0 errors, and shellcheck was clean. pytest **collected 293 items, 25 deselected
   (`-m 'not integration'`), 268 selected: 268 passed**.
-- Security scanner (`python -m security_scan.cli . --category security`, the CI step): 0 BLOCK,
-  4 WARN, and 1 INFO. All of them predate this change and are in files I didn't touch.
+- Security scanner (`python -m security_scan.cli . --category security`, the CI step), rerun
+  after the file was committed: 0 BLOCK, 4 WARN, and 1 INFO. None names `.cred-consumers.toml`. All of them predate this change and are in files I didn't touch.
 - CI's `security-scan.yml` also runs `agent_registry validate` and the read-guard tests. Neither
   touches this file. The read-guard tests are part of the 268.
 
@@ -114,8 +128,7 @@ Until the PR merges, that path doesn't exist. A listed file that can't be read t
   characters in them parse, as they do in the siblings.
 - The header doesn't copy orchestrator's line about `healthchecks_check`, because no row here is
   `rotated_by_sds`. It says plainly that the row falls to the manual checklist.
-- I didn't run `/code-review` on this change. It's a single data file, and I checked it against
-  the parser that consumes it.
+- `/code-review low` on `main...HEAD` reported no findings.
 
 ## Concerns
 
