@@ -6,7 +6,9 @@ Worker W-182. Branch `hq/fe-6-p6-ss`, base `origin/main` `0226b19`. Spec: orches
 `docs/superpowers/plans/2026-11-15-fe-6-mac-db-retire.md`, section "2. P6-SS", act step 12, and
 open question 4, answered by HQ as "drop the `shipped` and `head_seq` facts".
 
-**Hold:** the pull request is open and unmerged, titled with `hold: merge inside FE-6 step 12`. It
+Pull request: https://github.com/AlobarQuest/security-standards/pull/97 (change commit `10eb1a8`).
+
+**Hold:** the pull request is open and unmerged, with no auto-merge, titled with `hold: merge inside FE-6 step 12`. It
 merges inside the act, after step 11 deletes the gitignored `deploy/factory-events-db/.env`.
 
 ## What I built
@@ -50,8 +52,10 @@ I ran every command in this worktree, with the worktree's `.venv` (created with 
 | `make check` (ruff, ruff format, pyright, shellcheck, pytest) | exit 0, 268 passed, 25 deselected | exit 0, 264 passed, 22 deselected; pyright 0 errors |
 | `make check-integration` | exit 0, 25 passed | exit 0, 22 passed |
 | Security scanner, repository root, `--category security` | 0 BLOCK, 4 WARN, 1 INFO, 12 allowlisted | identical: no finding added or removed, and the allowlist is unchanged |
-| `security_scan.manifest.diff('.')` | `stale={ea09a782-…}`, hidden by `environment-injection` | `undeclared=set()`, `stale=set()` under `code-reference` |
+| Manifest drift | declared minus referenced is `{ea09a782-…}` (computed from `declared_uuids` and `referenced_uuids`; `diff()` reports no stale row under `environment-injection`, which skips that check) | `undeclared=set()`, `stale=set()` under `code-reference` |
 | `bash -n scripts/factory-events-nightly.sh` | — | exit 0 |
+| PR #97 CI | — | all pass: Lint, type-check, and test (2), scan (2), Factory-store integration tests |
+| `/code-review` (medium) on the branch diff | — | 4 findings, none confirmed; see the following Self-review section |
 | `python -m factory_events ship` | — | `invalid choice: 'ship' (choose from emit, verify, adapt, import-file)`, exit 1 |
 
 The counts drop exactly as the plan predicts: unit -4 (3 parametrize cases and
@@ -123,6 +127,20 @@ The act step 15 patterns (`:5545\b`, `5545:5432`, `FACTORY_DB_DSN`, `ea09a782`, 
   check now reports both directions: a declared row no runtime code names, and a runtime UUID no
   row declares. I rewrote the header to match. The old header said the secrets were provisioned
   into `~/.factory/env`, and that's no longer true of any row.
+- **`make install` and the manifest.** `governance ownership` (`ensure_bws_manifest`) writes
+  `.bws-secrets.toml` only when the file is missing, and nothing else in `src`, `scripts`,
+  `hooks`, or `skill` reads `consumption` except `manifest.py`. So step 12 keeps the explicit
+  `code-reference`.
+- **`/code-review` findings.** I checked all four, and none called for a change:
+  - The removed `.gitignore` entry: `.env` and `*.env` still ignore the file (Concern 1).
+  - The dropped facts: HQ found no reader, and open question 4 settles it.
+  - A `.cred-consumers.toml` row: that row is from #96, not this branch. The local `main` was at
+    `e905304`, behind `origin/main`; `git diff origin/main...HEAD` shows only this change.
+  - `code-reference` strictness: `referenced_uuids` finds all three UUIDs, and `diff()` is empty.
+- **Projection leftovers.** A grep for `5545`, `chain_heads`, `projection`, and `docker compose`
+  outside history docs finds only the nightly's new comment and unrelated uses of "projection" in
+  `docs/2026-06-19-governance-realignment-review.md`. The projection's DDL lived only in
+  `ship.py`.
 - **Scope.** I built only the plan's section and the facts drop from open question 4. Dead helpers
   stay where they are (see the following Follow-ups section).
 - **Secrets.** I read no secret value. I didn't open any `.env` or `~/.factory/env*` file, and I
