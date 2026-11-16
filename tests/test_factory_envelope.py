@@ -97,3 +97,21 @@ def test_make_event_accepts_orchestrator_source():
         "system": "orchestrator",
         "ref": "orchestrator:evidence:abc",
     }
+
+
+def _portfolio_scan_event(system: str) -> dict:
+    ev = _valid_event()
+    ev["actor"] = "portfolio-scan"
+    ev["action"] = "portfolio.scanned"
+    ev["source"] = {"system": system, "ref": "2026-11-17T08:00:35Z"}
+    return ev
+
+
+def test_schema_accepts_the_portfolio_scan_source():
+    """ADR-0059 Amendment 11 decision item 5: D-56 adds exactly one `source.system` value."""
+    envelope.validate_event(_portfolio_scan_event("portfolio-scan"))
+
+
+def test_schema_still_refuses_an_unknown_source_system():
+    with pytest.raises(envelope.EnvelopeError, match="source/system"):
+        envelope.validate_event(_portfolio_scan_event("portfolio-feed"))

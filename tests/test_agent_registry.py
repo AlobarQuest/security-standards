@@ -142,3 +142,16 @@ def test_the_change_manager_event_actors_resolve_to_themselves() -> None:
     assert _map_actor("deploy-policy") == "deploy-policy"
     assert _map_actor("change-proposer") == "change-proposer"
     assert _map_actor("an-id-nobody-registered") == "unknown"
+
+
+def test_portfolio_scan_is_a_registered_credential_less_label() -> None:
+    """ADR-0059 Amendment 11 decision item 5 (D-56 A): the actor on `portfolio.scanned` is a
+    label with no authority, the same kind of entry as `lane-credential-policy`."""
+    from agent_registry.registry import load_agents, registered_ids
+
+    assert "portfolio-scan" in registered_ids()
+    auth = effective_authority("portfolio-scan")
+    assert auth["authority_profile"] == "none-v1"
+    assert auth["capabilities"] == []
+    agent = load_agents()["portfolio-scan"]
+    assert (agent["runtime"], agent["environment"]) == ("unknown", "any")
