@@ -112,7 +112,7 @@ When the member record is unreadable, `"result": "unknown"` and `"evidence": [{"
 ## Tests and checks
 
 - **`make check` at `d8cec894`:** ruff `All checks passed!`, pyright `0 errors, 0 warnings, 0 informations`, and pytest `313 passed, 22 deselected` (`313/335 tests collected (22 deselected)`). The base `05963b7` gives 264 passed. PR 1's head (`7a0a85f`) gives 267.
-- **The 22 deselected tests** are the `integration` marker (`addopts = "-m 'not integration'"`), the database tests behind `make check-integration`. I didn't run them. This diff changes no database code, and the adapter reaches the chain only through `chain.event_ids` and `chain.append_event`, which those tests already cover.
+- **The 22 deselected tests** are the `integration` marker (`addopts = "-m 'not integration'"`), the database tests behind `make check-integration`. I didn't run them locally. CI's "Factory-store integration tests" job runs them, and it passed on both PRs, along with "Lint, type-check, and test" and "scan" (`gh pr checks 98` and `gh pr checks 99`).
 - **Security scan from the worktree root:** 0 BLOCK, 4 WARN, 1 INFO.
   - The four WARN findings are `bws.reference-by-stable-uuid` in three June planning docs and `src/security_scan/rules_cache.json`. This diff touches none of them.
   - The INFO finding is `bws.least-privilege-scope`, which needs judgment.
