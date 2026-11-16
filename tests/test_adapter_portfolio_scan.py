@@ -168,6 +168,8 @@ BAD_FEEDS = {
     "scanned_at pattern": _feed(scanned_at=f"2026-11-17T08:00:35+00:00{MARKER}"),
     "scanned_at with fractions": _feed(scanned_at="2026-11-17T08:00:35.1Z"),
     "scanned_at unpadded": _feed(scanned_at="2026-11-7T08:00:35Z"),
+    "scanned_at with a trailing newline": _feed(scanned_at=SCANNED_AT + "\n"),
+    "scanned_at a leap second": _feed(scanned_at="2026-11-17T08:00:60Z"),
     "scanned_at not a date": _feed(scanned_at="2026-13-45T08:00:35Z"),
     "scanned_at not a string": _feed(scanned_at=1),
     "reason not a string": _feed(member_record_unreadable=401, repositories=[]),
@@ -180,6 +182,9 @@ BAD_FEEDS = {
     "repository not lowercased": _feed(repositories=[_row(repository=f"Example-Owner/{MARKER}")]),
     "repository without owner": _feed(repositories=[_row(repository=MARKER)]),
     "repository with two slashes": _feed(repositories=[_row(repository=f"a/b/{MARKER}")]),
+    "repository with a trailing newline": _feed(
+        repositories=[_row(repository="example-owner/repo-a\n")]
+    ),
     "repository not a string": _feed(repositories=[_row(repository=7)]),
     "duplicate repository": _feed(repositories=[_rows()[0], _rows()[0]]),
     "checks not an object": _feed(repositories=[_row(checks=[MARKER])]),
