@@ -57,8 +57,6 @@ EVENTS_APPENDED=0
 CHAIN_EVENTS=0
 CHAIN_HEAD=""
 ANCHOR_VERIFIED=false
-SHIPPED=0
-HEAD_SEQ=0
 # Posted from the EXIT trap, because `fail` exits from the middle of the run: an end-of-script
 # post would observe only the runs that succeeded, which is the shape this whole change exists
 # to stop.
@@ -68,8 +66,6 @@ finish() {
     observe_fact chain_events "$CHAIN_EVENTS"
     observe_fact chain_head "${CHAIN_HEAD:-null}"
     observe_fact anchor_verified "$ANCHOR_VERIFIED"
-    observe_fact shipped "$SHIPPED"
-    observe_fact head_seq "$HEAD_SEQ"
     observe_report "$rc" 0 "$STAGE"
 }
 observe_init "chain:factory-events" chain_integrity operator-machine
@@ -236,8 +232,8 @@ else
 fi
 
 unset CHAIN_PASSWORD
-# No `ship`: it projects the pre-cut-over file and refuses with a chain password set (cli.py
-# `_cmd_ship`). The observation keeps its `shipped` and `head_seq` facts, at 0.
+# The nightly has no projection step: the database is the chain of record, so verify is the last
+# step before the success ping.
 hc_ping "" "$VERIFY_OUT"
 STAGE="complete"
 log "done (database chain)"

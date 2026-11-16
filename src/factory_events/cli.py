@@ -1,8 +1,8 @@
-"""factory-events CLI: emit, verify, adapt, ship, import-file.
+"""factory-events CLI: emit, verify, adapt, import-file.
 
 emit, verify and adapt use the database chain, and refuse when neither
 FACTORY_EVENTS_APPEND_PASSWORD nor FACTORY_EVENTS_READ_PASSWORD is set (chain.py). import-file
-reads an events file as its input; ship projects the pre-cut-over file until FE-6 retires it.
+reads an events file as its input.
 """
 
 import argparse
@@ -83,33 +83,6 @@ def _print_chain_ok(current: tuple[int, str] | None) -> None:
     )
 
 
-def _cmd_ship(args: argparse.Namespace) -> int:
-    try:
-        database_mode = chain.database_mode()
-    except ChainError as exc:
-        print(f"SHIP FAIL: {exc}", file=sys.stderr)
-        return 1
-    if database_mode:
-        # With a password set, the database is the chain; the file ship projects is a stale copy.
-        print(
-            "SHIP FAIL: ship projects the pre-cut-over file, and a chain password is set",
-            file=sys.stderr,
-        )
-        return 1
-    from factory_events import ship as ship_mod
-
-    try:
-        inserted, current = ship_mod.ship(rebuild=args.rebuild)
-    except Exception as exc:  # noqa: BLE001 — any DB failure is a hard job failure
-        print(f"SHIP FAIL: {exc}", file=sys.stderr)
-        return 1
-    if current:
-        print(f"shipped={inserted} head_seq={current[0]} head={current[1]}")
-    else:
-        print("shipped=0 (empty store)")
-    return 0
-
-
 def _cmd_adapt(args: argparse.Namespace) -> int:
     from factory_events.adapters import change_manager, high_power
 
@@ -175,16 +148,6 @@ def build_parser() -> argparse.ArgumentParser:
     adapt.add_argument("--source", required=True, choices=["high-power", "change-manager", "all"])
     adapt.add_argument("--reanchor", action="store_true")
     adapt.set_defaults(func=_cmd_adapt)
-
-    ship_cmd = sub.add_parser(
-        "ship", help="upsert the pre-cut-over file's events into the Postgres projection"
-    )
-    ship_cmd.add_argument(
-        "--rebuild",
-        action="store_true",
-        help="truncate factory_events (never chain_heads) and replay",
-    )
-    ship_cmd.set_defaults(func=_cmd_ship)
 
     import_cmd = sub.add_parser(
         "import-file",

@@ -6,9 +6,8 @@ chain (db.py) links its rows by the same formula, and walk_records verifies both
 
 Since FE-5 the database is the chain of record: emit and adapt never reach
 append_event here (chain.py refuses without a password). import-file reads a
-file through iter_records and walk_records; ship projects the pre-cut-over file
-until FE-6. factory_home() still locates the state directory: the adapters'
-watermarks and the database chain's anchor.
+file through iter_records and walk_records. factory_home() still locates the
+state directory: the adapters' watermarks and the database chain's anchor.
 """
 
 import fcntl
