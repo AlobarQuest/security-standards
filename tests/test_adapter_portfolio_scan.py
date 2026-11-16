@@ -115,8 +115,8 @@ def test_the_event_id_depends_only_on_scanned_at(memory_chain):
     assert [event["timestamp"] for event in memory_chain.events] == [SCANNED_AT, later]
 
 
-def test_an_unreadable_member_record_gives_unknown_and_one_typed_item(memory_chain):
-    reason = "the orchestrator answered 401 for GET /api/v1/members"
+@pytest.mark.parametrize("reason", ["the orchestrator answered 401 for GET /api/v1/members", ""])
+def test_an_unreadable_member_record_gives_unknown_and_one_typed_item(reason, memory_chain):
     _write(_feed(member_record_unreadable=reason, repositories=[]))
     assert portfolio_scan.adapt() == 1
     (event,) = memory_chain.events
@@ -131,6 +131,12 @@ def test_an_unknown_status_value_is_copied_not_refused(memory_chain):
     assert memory_chain.events[0]["evidence"] == [
         {"type": "repository", "repository": "example-owner/repo-a", "checks": rows[0]["checks"]}
     ]
+
+
+def test_a_repository_name_the_producer_can_write_is_accepted(memory_chain):
+    rows = [{"repository": "example_owner.x/repo.name_2", "checks": {}}]
+    _write(_feed(repositories=rows))
+    assert portfolio_scan.adapt() == 1
 
 
 def test_rows_are_copied_in_the_feeds_order(memory_chain):
@@ -173,7 +179,6 @@ BAD_FEEDS = {
     "scanned_at not a date": _feed(scanned_at="2026-13-45T08:00:35Z"),
     "scanned_at not a string": _feed(scanned_at=1),
     "reason not a string": _feed(member_record_unreadable=401, repositories=[]),
-    "reason empty": _feed(member_record_unreadable="", repositories=[]),
     "rows with an unreadable record": _feed(member_record_unreadable=MARKER),
     "repositories not a list": _feed(repositories={"example-owner/repo-a": {}}),
     "row not an object": _feed(repositories=[MARKER]),
@@ -181,6 +186,7 @@ BAD_FEEDS = {
     "row without checks": _feed(repositories=[{"repository": "example-owner/repo-a"}]),
     "repository not lowercased": _feed(repositories=[_row(repository=f"Example-Owner/{MARKER}")]),
     "repository without owner": _feed(repositories=[_row(repository=MARKER)]),
+    "repository with a space": _feed(repositories=[_row(repository=f"example-owner/{MARKER} x")]),
     "repository with two slashes": _feed(repositories=[_row(repository=f"a/b/{MARKER}")]),
     "repository with a trailing newline": _feed(
         repositories=[_row(repository="example-owner/repo-a\n")]
@@ -207,7 +213,9 @@ def test_a_bad_feed_appends_nothing_and_leaves_the_exit_alone(
     assert "ADAPT FAIL" not in err
 
 
-@pytest.mark.parametrize("make", ["missing", "a directory", "not utf-8", "not json"])
+@pytest.mark.parametrize(
+    "make", ["missing", "a directory", "not utf-8", "not json", "nested too deeply"]
+)
 def test_a_feed_that_cannot_be_read_appends_nothing(make, capsys, memory_chain, other_sources):
     path = _feed_file()
     if make == "a directory":
@@ -216,16 +224,21 @@ def test_a_feed_that_cannot_be_read_appends_nothing(make, capsys, memory_chain, 
         path.write_bytes(b"\xff\xfe{")
     elif make == "not json":
         path.write_text(f"{{{MARKER}")
+    elif make == "nested too deeply":
+        path.write_text("[" * 100_000)
     assert main(["adapt", "--source", "all"]) == 0
     out, err = capsys.readouterr()
     assert memory_chain.events == []
-    reason = {
-        "missing": "no feed file",
-        "a directory": "feed unreadable (IsADirectoryError)",
-        "not utf-8": "feed unreadable (UnicodeDecodeError)",
-        "not json": "feed is not JSON",
+    # Deep nesting surfaces as RecursionError or JSONDecodeError depending on the interpreter's
+    # stack; either way the feed is skipped.
+    reasons = {
+        "missing": ["no feed file"],
+        "a directory": ["feed unreadable (IsADirectoryError)"],
+        "not utf-8": ["feed unreadable (UnicodeDecodeError)"],
+        "not json": ["feed is not JSON"],
+        "nested too deeply": ["feed is nested too deeply to parse", "feed is not JSON"],
     }[make]
-    assert f"portfolio-scan: 0 events appended (feed skipped: {reason})" in out
+    assert any(f"portfolio-scan: 0 events appended (feed skipped: {r})" in out for r in reasons)
     assert MARKER not in out + err
 
 

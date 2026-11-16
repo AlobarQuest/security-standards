@@ -33,8 +33,9 @@ CHECK_IDS = frozenset(
 _FEED_KEYS = frozenset({"schema", "scanned_at", "member_record_unreadable", "repositories"})
 _ROW_KEYS = frozenset({"repository", "checks"})
 _SCANNED_AT = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
-# Matched with fullmatch: `$` would also match before a trailing newline.
-_REPOSITORY = re.compile(r"[a-z0-9][a-z0-9-]*/[a-z0-9._-]+")
+# The producer's own shape (project-standards `onboard_checks.repo_slug`, lowercased): one slash,
+# no whitespace either side. Matched with fullmatch: `$` would also match before a newline.
+_REPOSITORY = re.compile(r"[^/\s]+/[^/\s]+")
 
 
 class FeedError(RuntimeError):
@@ -58,6 +59,8 @@ def _read(path: Path) -> object:
         return json.loads(text)
     except json.JSONDecodeError:
         raise FeedError("feed is not JSON") from None
+    except RecursionError:
+        raise FeedError("feed is nested too deeply to parse") from None
 
 
 def _check_scanned_at(value: object) -> str:
@@ -79,7 +82,11 @@ def _check_rows(rows: object) -> list[dict]:
         if not isinstance(row, dict) or set(row) != _ROW_KEYS:
             raise FeedError(f"{where} is not exactly repository and checks")
         repository = row["repository"]
-        if not isinstance(repository, str) or not _REPOSITORY.fullmatch(repository):
+        if (
+            not isinstance(repository, str)
+            or not _REPOSITORY.fullmatch(repository)
+            or repository != repository.lower()
+        ):
             raise FeedError(f"{where}.repository is not a lowercased owner/repo")
         if repository in seen:
             raise FeedError(f"{where}.repository repeats an earlier row")
@@ -106,7 +113,7 @@ def load_feed(path: Path) -> tuple[str, list[dict], str]:
     rows = _check_rows(feed["repositories"])
     if reason is None:
         return scanned_at, [{"type": "repository", **row} for row in rows], "success"
-    if not isinstance(reason, str) or not reason:
+    if not isinstance(reason, str):
         raise FeedError("member_record_unreadable is neither null nor a reason string")
     if rows:
         raise FeedError("repositories is not empty for an unreadable member record")
