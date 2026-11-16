@@ -32,8 +32,9 @@ CHECK_IDS = frozenset(
 )
 _FEED_KEYS = frozenset({"schema", "scanned_at", "member_record_unreadable", "repositories"})
 _ROW_KEYS = frozenset({"repository", "checks"})
-_SCANNED_AT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
-_REPOSITORY = re.compile(r"^[a-z0-9][a-z0-9-]*/[a-z0-9._-]+$")
+_SCANNED_AT = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+# Matched with fullmatch: `$` would also match before a trailing newline.
+_REPOSITORY = re.compile(r"[a-z0-9][a-z0-9-]*/[a-z0-9._-]+")
 
 
 class FeedError(RuntimeError):
@@ -60,7 +61,7 @@ def _read(path: Path) -> object:
 
 
 def _check_scanned_at(value: object) -> str:
-    if not isinstance(value, str) or not _SCANNED_AT.match(value):
+    if not isinstance(value, str) or not _SCANNED_AT.fullmatch(value):
         raise FeedError("scanned_at is not a YYYY-MM-DDTHH:MM:SSZ time")
     try:
         datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
@@ -78,7 +79,7 @@ def _check_rows(rows: object) -> list[dict]:
         if not isinstance(row, dict) or set(row) != _ROW_KEYS:
             raise FeedError(f"{where} is not exactly repository and checks")
         repository = row["repository"]
-        if not isinstance(repository, str) or not _REPOSITORY.match(repository):
+        if not isinstance(repository, str) or not _REPOSITORY.fullmatch(repository):
             raise FeedError(f"{where}.repository is not a lowercased owner/repo")
         if repository in seen:
             raise FeedError(f"{where}.repository repeats an earlier row")
