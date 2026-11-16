@@ -1,0 +1,20 @@
+schema: agent-identity/v1
+agent_id: portfolio-scan
+version: 1
+status: active
+runtime: unknown
+operator: devon
+environment: any
+description: >-
+  The actor recorded on the `portfolio.scanned` event that the Mac factory-events nightly appends
+  from the portfolio scan's feed (`~/.portfolio/portfolio-feed.json`), one event per scan
+  (orchestrator ADR-0059 Amendment 11, D-56 A). A LABEL, NOT A RUNTIME — the same kind of entry
+  as `lane-credential-policy`. Nothing runs under this identity and no credential authenticates
+  as it: the nightly appends the event with its own append password, and the scan never touches
+  the chain. The event carries the scan's four check results per member repository for the work
+  carrier to read; it is interim, until Phase 3's onboarding scan runs those checks server-side.
+  `runtime: unknown` / `environment: any` mirror `lane-credential-policy` and `deploy-policy`,
+  the registry's established shape for a label.
+authority_profile: none-v1
+capabilities: []
+prohibited: []
