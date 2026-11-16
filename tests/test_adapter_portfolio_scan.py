@@ -2,6 +2,8 @@
 decision items 2 and 6). Every feed here is a file under tmp_path; the chain is MemoryChain."""
 
 import json
+import os
+from pathlib import Path
 
 import pytest
 
@@ -61,8 +63,14 @@ def _feed(**overrides) -> dict:
     return feed
 
 
+def _feed_file() -> Path:
+    """The fixture's path, read from the environment and not through feed_path(), so a broken
+    feed_path() can never make a test write the real feed."""
+    return Path(os.environ[portfolio_scan.FEED_ENV])
+
+
 def _write(feed: object) -> None:
-    portfolio_scan.feed_path().write_text(json.dumps(feed, indent=2, sort_keys=True) + "\n")
+    _feed_file().write_text(json.dumps(feed, indent=2, sort_keys=True) + "\n")
 
 
 def test_a_valid_feed_gives_exactly_one_event_and_a_rerun_appends_nothing(memory_chain):
@@ -135,6 +143,11 @@ def test_rows_are_copied_in_the_feeds_order(memory_chain):
     ]
 
 
+def test_the_override_names_the_feed(tmp_path, monkeypatch):
+    monkeypatch.setenv(portfolio_scan.FEED_ENV, str(tmp_path / "elsewhere.json"))
+    assert portfolio_scan.feed_path() == tmp_path / "elsewhere.json"
+
+
 def test_the_default_feed_is_the_portfolio_homes(tmp_path, monkeypatch):
     monkeypatch.delenv(portfolio_scan.FEED_ENV)
     monkeypatch.setenv("HOME", str(tmp_path))
@@ -154,6 +167,7 @@ BAD_FEEDS = {
     "other schema": _feed(schema=f"portfolio-feed.v2-{MARKER}"),
     "scanned_at pattern": _feed(scanned_at=f"2026-11-17T08:00:35+00:00{MARKER}"),
     "scanned_at with fractions": _feed(scanned_at="2026-11-17T08:00:35.1Z"),
+    "scanned_at unpadded": _feed(scanned_at="2026-11-7T08:00:35Z"),
     "scanned_at not a date": _feed(scanned_at="2026-13-45T08:00:35Z"),
     "scanned_at not a string": _feed(scanned_at=1),
     "reason not a string": _feed(member_record_unreadable=401, repositories=[]),
@@ -190,7 +204,7 @@ def test_a_bad_feed_appends_nothing_and_leaves_the_exit_alone(
 
 @pytest.mark.parametrize("make", ["missing", "a directory", "not utf-8", "not json"])
 def test_a_feed_that_cannot_be_read_appends_nothing(make, capsys, memory_chain, other_sources):
-    path = portfolio_scan.feed_path()
+    path = _feed_file()
     if make == "a directory":
         path.mkdir()
     elif make == "not utf-8":
@@ -200,7 +214,13 @@ def test_a_feed_that_cannot_be_read_appends_nothing(make, capsys, memory_chain, 
     assert main(["adapt", "--source", "all"]) == 0
     out, err = capsys.readouterr()
     assert memory_chain.events == []
-    assert "portfolio-scan: 0 events appended (feed skipped: " in out
+    reason = {
+        "missing": "no feed file",
+        "a directory": "feed unreadable (IsADirectoryError)",
+        "not utf-8": "feed unreadable (UnicodeDecodeError)",
+        "not json": "feed is not JSON",
+    }[make]
+    assert f"portfolio-scan: 0 events appended (feed skipped: {reason})" in out
     assert MARKER not in out + err
 
 
