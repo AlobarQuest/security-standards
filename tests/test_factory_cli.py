@@ -109,3 +109,13 @@ def test_adapt_high_power_via_cli(tmp_path, monkeypatch, capsys, memory_chain):
     assert main(["adapt", "--source", "high-power"]) == 0
     assert "1 events appended" in capsys.readouterr().out
     assert [event["action"] for event in memory_chain.events] == ["tool.vps_exec"]
+
+
+def test_no_test_reaches_the_real_portfolio_feed(tmp_path):
+    """conftest's floor: `adapt --source all` reads the feed, so a test that names no feed path
+    still never reads ~/.portfolio/portfolio-feed.json."""
+    from factory_events.adapters import portfolio_scan
+
+    path = portfolio_scan.feed_path()
+    assert path.is_relative_to(tmp_path)
+    assert not path.exists()
