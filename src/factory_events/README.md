@@ -16,9 +16,12 @@ writes or verifies a file since. Spec:
   direct event. Runtimes/executors declare identity by emitting with their
   registered actor id (validated against `registry/`). Refuses with
   `no chain password is set` when neither password is set.
-- `adapt --source high-power|change-manager|all [--reanchor]` — translate
-  source logs (watermarked, idempotent; `--reanchor` accepts a rewritten
-  high-power source file and re-ingests with event_id dedupe).
+- `adapt --source high-power|change-manager|portfolio-scan|all [--reanchor]` —
+  translate source logs (watermarked, idempotent; `--reanchor` accepts a
+  rewritten high-power source file and re-ingests with event_id dedupe). `all`
+  runs the three in that order. Each prints `<source>: N events appended`.
+  `portfolio-scan` appends one `portfolio.scanned` event per scan from the
+  portfolio scan's feed (see "The portfolio scan's feed").
 - `verify [--against-anchor | --record-anchor]` — walk the database chain's
   hash links + schema-validate every event (see "Anchor" below for the flags).
   Refuses with `no chain password is set` when neither password is set.
@@ -26,6 +29,37 @@ writes or verifies a file since. Spec:
   empty database chain in one transaction; commits only if the imported head
   equals the file's head. Connects as the append role, from
   `FACTORY_EVENTS_APPEND_PASSWORD` and the three DB settings.
+
+## The portfolio scan's feed (orchestrator ADR-0059 Amendment 11)
+
+`adapt --source portfolio-scan` reads `~/.portfolio/portfolio-feed.json`, which
+the 03:00 portfolio scan writes (project-standards `src/portfolio/feed.py`).
+`FACTORY_EVENTS_PORTFOLIO_FEED` names another path; the tests use it. The
+adapter only copies the feed. It reads no member record and changes no row or
+status.
+
+It appends one event per scan, with these fields:
+
+- `action` `portfolio.scanned`, `actor` `portfolio-scan` (a registry label that
+  no credential authenticates as), and `target` `null`.
+- `timestamp` and `source.ref` are the feed's `scanned_at`, verbatim, and
+  `source.system` is `portfolio-scan`.
+- `event_id` is `deterministic_event_id("portfolio-scan", scanned_at)`, so a
+  run that finds the same feed again appends nothing.
+- When the member record was read, `evidence` holds one
+  `{"type": "repository", "repository": "<owner/repo>", "checks": {...}}` per
+  feed row, in the feed's order, and `result` is `success`.
+- When the feed's `member_record_unreadable` is a reason string, `evidence` is
+  exactly `[{"type": "member-record-unreadable", "reason": "<the string>"}]` and
+  `result` is `unknown`.
+
+The adapter checks the whole feed before it builds the event. A missing,
+unreadable, non-JSON or malformed feed appends nothing: `adapt` prints
+`portfolio-scan: 0 events appended (feed skipped: <reason>)`, where the reason
+names a field and never its content, and the exit doesn't change (decision
+item 6). The work carrier holding its repository-targeted records is the
+signal. An `EnvelopeError` or a `ChainError` fails the adapt, as the other
+sources' errors do.
 
 ## The database chain (orchestrator ADR-0055 amendment 24)
 
@@ -160,8 +194,9 @@ holder at once.
 3. Runs verify --against-anchor, before anything appends: it checks
    `$FACTORY_EVENTS_HOME/state/chain-anchor.json` when that file exists, and is a plain
    database verify when it doesn't.
-4. Runs adapt all, then verify --record-anchor, which checks the anchor again and anchors the
-   verified head.
+4. Runs adapt all (high-power, change-manager, then the portfolio scan's feed), then
+   verify --record-anchor, which checks the anchor again and anchors the verified head. A bad
+   feed appends nothing and doesn't fail the run (see "The portfolio scan's feed").
 5. Pings success with the verify output.
 
 The password and the three settings reach only the `python -m factory_events` children, as an

@@ -84,7 +84,7 @@ def _print_chain_ok(current: tuple[int, str] | None) -> None:
 
 
 def _cmd_adapt(args: argparse.Namespace) -> int:
-    from factory_events.adapters import change_manager, high_power
+    from factory_events.adapters import change_manager, high_power, portfolio_scan
 
     failures = 0
     if args.source in ("high-power", "all"):
@@ -100,6 +100,19 @@ def _cmd_adapt(args: argparse.Namespace) -> int:
             print(f"change-manager: {count} events appended")
         except (change_manager.ConfigError, OSError, ChainError) as exc:
             print(f"ADAPT FAIL (change-manager): {exc}", file=sys.stderr)
+            failures += 1
+    # Last in `all`, so its failure never stops the other two.
+    if args.source in ("portfolio-scan", "all"):
+        try:
+            count = portfolio_scan.adapt()
+            print(f"portfolio-scan: {count} events appended")
+        except portfolio_scan.FeedError as exc:
+            # Deliberate swallow (orchestrator ADR-0059 Amendment 11, decision item 6): a missing,
+            # unreadable or malformed feed appends nothing and leaves the nightly's exit as it
+            # was; the carrier holding its records is the signal. The reason names a field only.
+            print(f"portfolio-scan: 0 events appended (feed skipped: {exc})")
+        except (EnvelopeError, ChainError) as exc:
+            print(f"ADAPT FAIL (portfolio-scan): {exc}", file=sys.stderr)
             failures += 1
     return 1 if failures else 0
 
@@ -145,7 +158,11 @@ def build_parser() -> argparse.ArgumentParser:
     verify.set_defaults(func=_cmd_verify)
 
     adapt = sub.add_parser("adapt", help="translate source logs into the database chain")
-    adapt.add_argument("--source", required=True, choices=["high-power", "change-manager", "all"])
+    adapt.add_argument(
+        "--source",
+        required=True,
+        choices=["high-power", "change-manager", "portfolio-scan", "all"],
+    )
     adapt.add_argument("--reanchor", action="store_true")
     adapt.set_defaults(func=_cmd_adapt)
 
