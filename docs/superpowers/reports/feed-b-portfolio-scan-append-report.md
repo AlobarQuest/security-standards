@@ -231,3 +231,35 @@ Step (c), the carrier's reader and the orchestrator's pinned copy, can rely on t
 - **Infra Brain 591, 592, and 593 (no BWS token in tracked files or history, no inline `BWS_ACCESS_TOKEN` value):** the diff contains no token and no `BWS_ACCESS_TOKEN` assignment. The security scan reports 0 BLOCK. The test placeholder `CM_M2M_TOKEN=placeholder` isn't a credential.
 - **Infra Brain 1032 (`cred.exposure-rotate`):** I saw no secret value during this work. I read no env file and fetched no credential.
 - **Infra Brain 212 (HTTPS for public FQDNs):** doesn't apply. The diff makes no network change. The tests' `https://change-manager.invalid` is never contacted, because `_http_fetch` is replaced.
+
+## Rebase onto `main` (W-198)
+
+PR #99 was stacked on #98, which squash-merged as `08754a0`. Its branch still carried #98's pre-squash commit `7a0a85f`, so its diff against `main` showed 11 files. W-198 rebased only #99's own commits onto `main`, and PR #100 supersedes #99.
+
+- **Old head:** `2871a92d880bdf860ff9d127aaa98716ef0d61b7` on `hq/feed-b-portfolio-scan-append-adapter`, left untouched.
+- **New head before this section:** `cbdc5863c6cefecf6049661105555b3cb0bdea75` on `hq/feed-b2-rebase`.
+- **Dropped commit:** `7a0a85f` (#98's content, already on `main` as `08754a0`).
+- **Command:** `git rebase --onto origin/main 7a0a85f`. It had no conflicts.
+- **`git range-diff 7a0a85f..2871a92 origin/main..cbdc586`:** all six pairs are identical (`=`): `8590dd2→65022c4`, `907f809→dadc10d`, `2866a00→0e32275`, `d8cec89→77c77c9`, `d1bf7ad→12d7b0f`, and `2871a92→cbdc586`.
+- **`git diff --stat origin/main...cbdc586`:** 7 files, 734 insertions and 7 deletions:
+  - `docs/superpowers/reports/feed-b-portfolio-scan-append-report.md`
+  - `src/factory_events/README.md`
+  - `src/factory_events/adapters/portfolio_scan.py`
+  - `src/factory_events/cli.py`
+  - `tests/conftest.py`
+  - `tests/test_adapter_portfolio_scan.py`
+  - `tests/test_factory_cli.py`
+
+  `registry/agents/portfolio-scan.yaml` and `schema/factory-event.v1.schema.json` no longer differ from `main`.
+- **`make check` (local, on `cbdc586`):** ruff, ruff format, and pyright clean; 313 passed, 22 deselected.
+- **Security scan (local, worktree root):** BLOCK 0, WARN 4, INFO 1. Every WARN and INFO is in a file outside this diff.
+- **Push:** the HQ guard hook denied the `--force-with-lease` push to `hq/feed-b-portfolio-scan-append-adapter`. Following HQ's answer, W-198 pushed the rebased head to `hq/feed-b2-rebase` with a normal push and opened PR #100 from it. #99 is unchanged.
+- **CI on `cbdc586`:** every check passed.
+
+  | Workflow | Event | Result | Tests |
+  |---|---|---|---|
+  | Quality (Lint, type-check, and test) | push | success | collected 335, 22 deselected, 313 passed |
+  | Quality (Lint, type-check, and test) | pull_request | success | collected 335, 22 deselected, 313 passed |
+  | Security Scan (scan) | push | success | 35 passed; scan BLOCK 0, WARN 4 |
+  | Security Scan (scan) | pull_request | success | 35 passed; scan BLOCK 0, WARN 4 |
+  | Extended tests (Factory-store integration tests) | pull_request | success | 22 passed, 313 deselected |
