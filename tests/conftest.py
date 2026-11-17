@@ -54,6 +54,13 @@ def _no_ambient_chain_settings(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _no_real_portfolio_feed(tmp_path, monkeypatch):
+    """No test reads the real ~/.portfolio/portfolio-feed.json: `adapt --source all` reads the
+    feed, so every test points it at a path under tmp_path that doesn't exist."""
+    monkeypatch.setenv("FACTORY_EVENTS_PORTFOLIO_FEED", str(tmp_path / "no-portfolio-feed.json"))
+
+
 class MemoryChain:
     """An in-memory stand-in for the database chain: db.append_event and db.event_ids, linked
     by the same formula. `make check-integration` runs the real one."""
