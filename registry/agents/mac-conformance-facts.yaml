@@ -1,0 +1,19 @@
+schema: agent-identity/v1
+agent_id: mac-conformance-facts
+version: 1
+status: active
+runtime: unknown
+operator: devon
+environment: any
+description: >-
+  The actor recorded on the `mac_conformance.reported` event that the Mac factory-events nightly
+  appends from the newest infra-drift report and the Mac's LaunchAgent and Claude hook wiring, one
+  event per report (orchestrator ADR-0059 Amendment 13, D-62 C). A LABEL, NOT A RUNTIME — the same
+  kind of entry as `portfolio-scan`. Nothing runs under this identity and no credential
+  authenticates as it: the nightly appends the event with its own append password. The event
+  carries ids and statuses only, for the bump driver's container to read for its conformance
+  claim. `runtime: unknown` / `environment: any` mirror `portfolio-scan`, the registry's
+  established shape for a label.
+authority_profile: none-v1
+capabilities: []
+prohibited: []
