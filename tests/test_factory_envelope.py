@@ -115,3 +115,12 @@ def test_schema_accepts_the_portfolio_scan_source():
 def test_schema_still_refuses_an_unknown_source_system():
     with pytest.raises(envelope.EnvelopeError, match="source/system"):
         envelope.validate_event(_portfolio_scan_event("portfolio-feed"))
+
+
+def test_schema_accepts_the_mac_conformance_facts_source():
+    """ADR-0059 Amendment 13 decision item 7: D-62 adds exactly one `source.system` value."""
+    ev = _valid_event()
+    ev["actor"] = "mac-conformance-facts"
+    ev["action"] = "mac_conformance.reported"
+    ev["source"] = {"system": "mac-conformance-facts", "ref": "2026-11-18T08:00:39Z"}
+    envelope.validate_event(ev)
