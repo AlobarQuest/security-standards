@@ -4,9 +4,42 @@ Outcome: done
 
 - **PR:** AlobarQuest/security-standards#101, ready for review, not merged.
 - **Branch:** `hq/mac-conformance-facts-event`, based on `origin/main` `23854235`.
-- **Content commit:** `93d4cc9`. The report commit follows it and is the head.
+- **Content commits:** `93d4cc9` (the change) and `0deaa24` (a fix that review found: an
+  over-long JSON integer). The report commits follow them; the branch head is the last report
+  commit.
 - **Source:** orchestrator ADR-0059 Amendment 13 (D-62 C) at `90f26ecd`, decision items 2, 3, 5,
   6 and 7 and the verify items.
+
+## Merge order: read this first
+
+Don't merge #101 until the orchestrator image pins a security-standards revision whose schema
+holds `mac-conformance-facts`.
+
+The work carrier's container verifies the whole chain on every pass. It runs
+`orchestrator.factory_chain_read` → `factory_events.store.walk_records` → `validate_event` with
+`SECURITY_STANDARDS_DIR=/app/security-standards`, which is the image's pinned copy
+(orchestrator `security-standards.pin.toml`, `revision` `08754a0f` today; `Dockerfile` lines
+42-44). intent-packages' `verify-approval` inside the carrier inherits the same copy.
+
+Once #101 is on the Mac checkout's `main`, the next 03:30 nightly appends a
+`mac_conformance.reported` event whose `source.system` the pinned schema rejects. Every carrier
+pass then fails its verify with a schema violation until the pin moves. The security-standards
+`SessionStart` hook fast-forwards the Mac's `main` on its own, so the gap between merge and the
+first append can be short.
+
+This is the hazard Amendment 11 avoided by landing its schema and registry change (#98) before
+its adapter (#100); see `feed-b-portfolio-scan-append-report.md`, "Merge order". The handoff
+asked for one PR, so I kept one. HQ has two safe orders:
+
+1. **Split (the precedent's order).** Land the schema value and the registry file alone first.
+   Bump the orchestrator pin (`revision` and `artifact_sha256` together, since the registry
+   bundle gains an agent), rebuild, and roll the carrier. Then land the adapter. I can split
+   #101 into those two PRs on request.
+2. **One PR, nightly held.** Merge #101, bump the pin to its merge commit, and roll the carrier
+   before any 03:30 nightly runs on that `main`.
+
+Also update orchestrator's `tests/fixtures/security-standards/` (schema and
+`registry/agents/mac-conformance-facts.yaml`) for its CI and guards, as feed b did.
 
 ## What I built
 
@@ -144,7 +177,8 @@ covers it.
 **`make check` on the clean base:** 313 passed, 22 deselected.
 
 **`make check` on the branch:** ruff, format, and type checks pass, and pytest reports
-**364 passed, 22 deselected** in 15 s (51 new tests).
+**366 passed, 22 deselected** in 15 s (53 new tests). CI on #101 passed (lint, type-check,
+and test; factory-store integration tests; scan) at the first content commit.
 
 The security scan ran from the worktree root:
 `PYTHONPATH=$PWD/src .venv/bin/python -m security_scan.cli . --category security`. It reported
@@ -155,16 +189,16 @@ The following list maps each test the handoff asked for to where it lives:
 
 - **Exit and ping unchanged with the step's inputs missing and malformed.**
   - Python side (`test_adapter_mac_conformance.py`): `adapt --source all` exits 0 with no
-    report, an empty directory, only sibling files, or an unlistable directory. It also exits 0
-    for all 10 unreadable-report cases and all 10 odd-settings cases, and prints no
-    `ADAPT FAIL`.
+    report, an empty directory, only sibling files, a directory whose entries can't be examined,
+    or an unlistable directory. It also exits 0 for all 11 unreadable-report cases, and prints
+    no `ADAPT FAIL`. The 10 odd-settings cases run `--source mac-conformance-facts` and exit 0.
   - Shell side (`test_factory_nightly.py::test_the_mac_conformance_step_leaves_the_exit_and_ping_alone`):
     with the step's skip line or its unreadable-record line in the adapt output, the nightly
     exits 0, pings `/start` then success, and sums `events_appended` as before.
 - **An unreadable report is newer than the previous day's event.**
   `test_an_unreadable_record_is_newer_than_the_previous_days_event` places the previous report
   late in its day (`2026-11-18T07:59:59Z`). The newest event by `timestamp` is the unreadable
-  record. All 10 unreadable cases also assert the record is newer than the previous event.
+  record. All 11 unreadable cases also assert the record is newer than the previous event.
 - **No free text.** In `test_the_event_carries_no_free_text_from_the_report_or_the_settings`,
   every free-text field carries a marker: `description`, `reasoning`, `question`,
   `planned_action`, `source`, `errors`, `standards_source`, `delta`, and the settings `env`. The
@@ -222,7 +256,13 @@ lower-confidence points. The following list gives my response to each:
    either way, as on the Mac.
 5. **`OSError` could escape the adapter.** On Python 3.14, `Path.is_dir` and `Path.is_file`
    return False on `OSError`. The adapter catches errors from `iterdir`, the report read, and
-   the settings read, and the tests cover the unlistable-directory and unreadable-file cases.
+   the settings read. Tests cover an unlistable directory, a directory whose entries can't be
+   examined (mode `0o600`), and an unreadable file.
+
+A second review pass found one real gap, fixed in `0deaa24`. `json` raises a plain `ValueError`,
+not `JSONDecodeError`, for an integer longer than its digit limit. That escaped `_read_report`,
+which would have failed the nightly and skipped `portfolio-scan`. The read now catches
+`ValueError`, and a test case covers it.
 6. **The hard-coded `WIRING` can drift.** I accept that, as discussed in "The wiring set and its
    source": it fails closed. Follow-up 3 covers it.
 
@@ -231,6 +271,12 @@ removed them by renaming the exceptions to `NoReportError` and `UnreadableError`
 
 ## Concerns
 
+- **Merge order.** See "Merge order: read this first". This is the concern that matters most.
+- **A transient fault keeps the hold until the next report.** If the newest file is unreadable
+  at 03:30 (for example, still being written) and a rerun later reads it, the readable event's
+  `timestamp` is the report's `generated_at`, which is earlier than the unreadable record's run
+  time. The reader keeps taking the unreadable record and holds until the next day's report.
+  That fails closed. A person can clear it only by a newer report.
 - **Missing report versus unreadable report.** Amendment 13 has the unreadable record cover "a
   newest report that can't be read or parsed". I read a directory with no report as having no
   newest report, so the step appends nothing, and the container reads the previous event until
@@ -268,6 +314,8 @@ removed them by renaming the exceptions to `NoReportError` and `UnreadableError`
    `_infra_proposal_message` falls back to the id, as Amendment 13 notes.
 5. **Wiring changes.** A wiring change reaches the chain only with the next infra-drift report.
    If a faster refresh matters, the reader would need a tie-break rule first.
+6. **A transient unreadable record.** It outranks a later readable event for the same report
+   (see Concerns). The reader holds; the next report clears it.
 
 ## Standards followed
 
