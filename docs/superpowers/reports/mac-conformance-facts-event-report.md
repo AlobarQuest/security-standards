@@ -276,7 +276,7 @@ removed them by renaming the exceptions to `NoReportError` and `UnreadableError`
   `ADAPT FAIL (mac-conformance-facts): …` on stderr. The nightly script parses that form: its
   `sed` sums `N events appended` across lines. A JSON line would break the
   `events_appended` fact the nightly test asserts. The nightly writes those lines into its own
-  log and ping body.
+  log.
 - **Code Brain 4 (never silently swallow an exception).** There's exactly one deliberate
   swallow, `NoReportError` in `cli._adapt_mac_conformance`. It carries an inline justification
   naming ADR-0059 Amendment 13 decision item 5, and prints the reason. The other places where
