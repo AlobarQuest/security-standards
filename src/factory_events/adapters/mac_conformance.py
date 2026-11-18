@@ -149,7 +149,8 @@ def _read_report(path: Path) -> tuple[str, list[dict], str]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError) as exc:
         raise UnreadableError(f"report unreadable ({type(exc).__name__})") from None
-    except json.JSONDecodeError:
+    except ValueError:
+        # JSONDecodeError, and the plain ValueError json raises for an integer past its digit limit.
         raise UnreadableError("report is not JSON") from None
     except RecursionError:
         raise UnreadableError("report is nested too deeply to parse") from None

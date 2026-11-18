@@ -314,8 +314,7 @@ UNREADABLE = {
 
 def _unreadable_file(make: str) -> Path:
     path = _reports() / "2026-11-18.json"
-    if make == "a directory":
-        # A directory isn't a candidate, so the older report is newest; use a mode-000 file.
+    if make == "not readable":
         path.write_text(json.dumps(_report()))
         path.chmod(0)
     elif make == "not utf-8":
@@ -324,6 +323,8 @@ def _unreadable_file(make: str) -> Path:
         path.write_text(f"{{{MARKER}")
     elif make == "nested too deeply":
         path.write_text("[" * 100_000)
+    elif make == "an integer too long":
+        path.write_text("1" * 5000)
     else:
         path.write_text(json.dumps(UNREADABLE[make][0]))
     return path
@@ -351,6 +352,7 @@ FILE_FAULTS = {
     "not json": ["report is not JSON"],
     # Deep nesting surfaces as RecursionError or JSONDecodeError depending on the stack.
     "nested too deeply": ["report is nested too deeply to parse", "report is not JSON"],
+    "an integer too long": ["report is not JSON"],
 }
 
 
@@ -360,7 +362,7 @@ def test_an_unreadable_newest_report_is_recorded_not_skipped(
 ):
     _write(_report(generated_at=PREVIOUS_AT), "2026-11-17.json")
     assert mac_conformance.adapt(RUN_AT) == 1
-    _unreadable_file("a directory" if make == "not readable" else make)
+    _unreadable_file(make)
     try:
         assert main(["adapt", "--source", "all"]) == 0
     finally:
@@ -418,6 +420,23 @@ def test_no_report_appends_nothing_and_leaves_the_exit_alone(
         "no infra-drift report directory" if make == "no directory" else "no infra-drift report"
     )
     assert f"mac-conformance-facts: 0 events appended (report skipped: {reason})" in out
+    assert "ADAPT FAIL" not in err
+
+
+def test_a_directory_whose_entries_cannot_be_examined_appends_nothing(
+    capsys, memory_chain, other_sources
+):
+    """Mode 0o600: the names list, but no entry can be stat-ed, so is_file() is False for each."""
+    _write(_report())
+    directory = _reports()
+    directory.chmod(0o600)
+    try:
+        assert main(["adapt", "--source", "all"]) == 0
+    finally:
+        directory.chmod(0o700)
+    out, err = capsys.readouterr()
+    assert memory_chain.events == []
+    assert "mac-conformance-facts: 0 events appended (report skipped: no infra-drift report)" in out
     assert "ADAPT FAIL" not in err
 
 
