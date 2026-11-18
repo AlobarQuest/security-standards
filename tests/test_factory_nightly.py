@@ -90,8 +90,8 @@ elif tool == "python":
         print("VERIFY FAIL: stub", file=sys.stderr)
         sys.exit(1)
     if command == "adapt":
-        print("high-power: 2 events appended")
-        print("change-manager: 1 events appended")
+        default = ["high-power: 2 events appended", "change-manager: 1 events appended"]
+        print("\n".join(control.get("adapt_lines", default)))
     elif command == "verify":
         if "--against-anchor" in argv or "--record-anchor" in argv:
             print("anchor ok: seq 4 present")
@@ -243,6 +243,35 @@ def test_file_present_verifies_adapts_and_records_the_anchor_without_ship(
     assert "head_seq" not in facts
     assert facts["chain_events"] == "7"
     assert facts["anchor_verified"] == "true"
+
+
+@pytest.mark.parametrize(
+    ("mac_line", "appended"),
+    [
+        ("mac-conformance-facts: 0 events appended (report skipped: no infra-drift report)", "3"),
+        ("mac-conformance-facts: 1 events appended", "4"),
+    ],
+    ids=["no report", "unreadable report recorded"],
+)
+def test_the_mac_conformance_step_leaves_the_exit_and_ping_alone(
+    nightly: Nightly, mac_line: str, appended: str
+) -> None:
+    """ADR-0059 Amendment 13 decision item 5: with the step's input missing or unreadable,
+    `adapt --source all` exits 0 (test_adapter_mac_conformance) and prints one of these lines;
+    the nightly then exits 0, pings success and sums the counts as before."""
+    nightly.switch.write_text(SWITCH)
+    nightly.control["adapt_lines"] = [
+        "high-power: 2 events appended",
+        "change-manager: 1 events appended",
+        mac_line,
+        "portfolio-scan: 0 events appended (feed skipped: no feed file)",
+    ]
+
+    result = nightly.run()
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert nightly.pings() == [f"{PING_URL}/start", PING_URL]
+    assert nightly.facts()["events_appended"] == appended
 
 
 def test_file_present_fetches_the_password_through_the_nightly_item_only(

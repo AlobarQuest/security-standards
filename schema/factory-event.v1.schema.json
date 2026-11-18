@@ -23,7 +23,7 @@
       "additionalProperties": false,
       "required": ["system", "ref"],
       "properties": {
-        "system": {"enum": ["high-power-audit", "change-manager", "orchestrator", "direct", "portfolio-scan"]},
+        "system": {"enum": ["high-power-audit", "change-manager", "orchestrator", "direct", "portfolio-scan", "mac-conformance-facts"]},
         "ref": {"type": "string"}
       }
     }

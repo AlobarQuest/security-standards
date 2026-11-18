@@ -155,3 +155,17 @@ def test_portfolio_scan_is_a_registered_credential_less_label() -> None:
     assert auth["capabilities"] == []
     agent = load_agents()["portfolio-scan"]
     assert (agent["runtime"], agent["environment"]) == ("unknown", "any")
+
+
+def test_mac_conformance_facts_is_a_registered_credential_less_label() -> None:
+    """ADR-0059 Amendment 13 decision item 7 (D-62 C): the actor on `mac_conformance.reported`
+    is a label with no authority, the same kind of entry as `portfolio-scan`."""
+    from agent_registry.registry import load_agents, registered_ids
+
+    assert "mac-conformance-facts" in registered_ids()
+    auth = effective_authority("mac-conformance-facts")
+    assert auth["authority_profile"] == "none-v1"
+    assert auth["capabilities"] == []
+    agent = load_agents()["mac-conformance-facts"]
+    assert (agent["runtime"], agent["environment"]) == ("unknown", "any")
+    assert agent["prohibited"] == []

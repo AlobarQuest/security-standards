@@ -251,7 +251,7 @@ def test_a_chain_error_fails_the_adapt(capsys, memory_chain, other_sources, monk
     assert main(["adapt", "--source", "all"]) == 1
     out, err = capsys.readouterr()
     assert "ADAPT FAIL (portfolio-scan): append failed" in err
-    # The other two ran first, and still reported.
+    # The others ran first, and still reported.
     assert out.splitlines()[:2] == [
         "high-power: 0 events appended",
         "change-manager: 0 events appended",
@@ -275,6 +275,8 @@ def test_portfolio_scan_runs_last_in_all(capsys, memory_chain, other_sources):
     assert capsys.readouterr().out.splitlines() == [
         "high-power: 0 events appended",
         "change-manager: 0 events appended",
+        "mac-conformance-facts: 0 events appended"
+        " (report skipped: no infra-drift report directory)",
         "portfolio-scan: 1 events appended",
     ]
 
