@@ -173,7 +173,7 @@ def test_a_report_gives_one_event_of_ids_and_statuses_and_a_rerun_appends_nothin
 
     # Same inputs twice append one event; so does a rerun whose wiring changed (one per report).
     assert mac_conformance.adapt(RUN_AT) == 0
-    _wire(agents=("com.devon.change-window",))
+    _wire(agents=("com.devon.portfolio-scan",))
     assert mac_conformance.adapt(RUN_AT) == 0
     assert len(memory_chain.events) == 1
 
@@ -509,20 +509,21 @@ def test_a_hook_is_present_by_any_token_basename(memory_chain):
 
 def test_a_launchagent_is_present_only_as_a_plist_file(memory_chain):
     _write(_report())
-    _wire(agents=("com.devon.change-window", "com.devon.vps-backup"))
+    _wire(agents=("com.devon.portfolio-scan", "com.devon.change-window", "com.devon.vps-backup"))
     (Path(os.environ[mac_conformance.LAUNCHAGENTS_ENV]) / "com.devon.factory-events.plist").mkdir()
     mac_conformance.adapt(RUN_AT)
     wiring = [e for e in memory_chain.events[0]["evidence"] if e["type"] == "wiring"]
-    assert wiring == _wiring({"launchagent:com.devon.change-window"})
+    assert wiring == _wiring({"launchagent:com.devon.portfolio-scan"})
 
 
 # The wiring bounds (Amendment 13 verify items). Each member's `launchagent:` and `hook:`
 # required_checks executors, read from PROJECT.md at its `main` on 2026-11-18 for the 13
 # repositories of orchestrator `docs/operations/membership-seed.toml`. Members not listed declare
-# none (brain, orchestrator, infraops-mcp-server, intent-packages, factory-runner) or have no
-# PROJECT.md (rtk, claude-octopus, rea, n8n-as-code, n8n-manager).
+# none (brain, orchestrator, infraops-mcp-server, intent-packages, factory-runner, and
+# change-manager once its `launchagent:com.devon.change-window` check left with the window's move
+# to the orchestrator lane) or have no PROJECT.md (rtk, claude-octopus, rea, n8n-as-code,
+# n8n-manager).
 MEMBER_DECLARATIONS = {
-    "alobarquest/change-manager": {"launchagent:com.devon.change-window"},  # 89f87345
     "alobarquest/project-standards": {"launchagent:com.devon.portfolio-scan"},  # 4673d726
     "alobarquest/security-standards": {  # 23854235
         "hook:bws-scan-gate.sh",
@@ -534,7 +535,7 @@ MEMBER_DECLARATIONS = {
 
 def test_the_wiring_set_holds_every_declared_entry_and_nothing_else():
     declared = set().union(*MEMBER_DECLARATIONS.values())
-    assert len(declared) == 5
+    assert len(declared) == 4
     assert set(mac_conformance.WIRING) == declared
     assert len(mac_conformance.WIRING) == len(set(mac_conformance.WIRING))
 
