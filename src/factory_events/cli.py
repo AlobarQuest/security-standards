@@ -83,8 +83,48 @@ def _print_chain_ok(current: tuple[int, str] | None) -> None:
     )
 
 
+def _adapt_mac_conformance() -> int:
+    """One `mac_conformance.reported` event; 1 for a failure, 0 otherwise."""
+    from factory_events.adapters import mac_conformance
+
+    try:
+        count = mac_conformance.adapt()
+    except mac_conformance.NoReportError as exc:
+        # Deliberate swallow (orchestrator ADR-0059 Amendment 13, decision item 5): with no
+        # infra-drift report there is nothing to record, so this appends nothing and leaves the
+        # nightly's exit as it was; the bump driver holds once the newest event ages out. An
+        # unreadable report is not this case: it appends the unreadable record. The reason names
+        # a condition only.
+        print(f"mac-conformance-facts: 0 events appended (report skipped: {exc})")
+        return 0
+    except (EnvelopeError, ChainError) as exc:
+        print(f"ADAPT FAIL (mac-conformance-facts): {exc}", file=sys.stderr)
+        return 1
+    print(f"mac-conformance-facts: {count} events appended")
+    return 0
+
+
+def _adapt_portfolio_scan() -> int:
+    """One `portfolio.scanned` event; 1 for a failure, 0 otherwise."""
+    from factory_events.adapters import portfolio_scan
+
+    try:
+        count = portfolio_scan.adapt()
+    except portfolio_scan.FeedError as exc:
+        # Deliberate swallow (orchestrator ADR-0059 Amendment 11, decision item 6): a missing,
+        # unreadable or malformed feed appends nothing and leaves the nightly's exit as it
+        # was; the carrier holding its records is the signal. The reason names a field only.
+        print(f"portfolio-scan: 0 events appended (feed skipped: {exc})")
+        return 0
+    except (EnvelopeError, ChainError) as exc:
+        print(f"ADAPT FAIL (portfolio-scan): {exc}", file=sys.stderr)
+        return 1
+    print(f"portfolio-scan: {count} events appended")
+    return 0
+
+
 def _cmd_adapt(args: argparse.Namespace) -> int:
-    from factory_events.adapters import change_manager, high_power, portfolio_scan
+    from factory_events.adapters import change_manager, high_power
 
     failures = 0
     if args.source in ("high-power", "all"):
@@ -101,19 +141,11 @@ def _cmd_adapt(args: argparse.Namespace) -> int:
         except (change_manager.ConfigError, OSError, ChainError) as exc:
             print(f"ADAPT FAIL (change-manager): {exc}", file=sys.stderr)
             failures += 1
-    # Last in `all`, so its failure never stops the other two.
+    if args.source in ("mac-conformance-facts", "all"):
+        failures += _adapt_mac_conformance()
+    # Last in `all`, so its failure never stops the others.
     if args.source in ("portfolio-scan", "all"):
-        try:
-            count = portfolio_scan.adapt()
-            print(f"portfolio-scan: {count} events appended")
-        except portfolio_scan.FeedError as exc:
-            # Deliberate swallow (orchestrator ADR-0059 Amendment 11, decision item 6): a missing,
-            # unreadable or malformed feed appends nothing and leaves the nightly's exit as it
-            # was; the carrier holding its records is the signal. The reason names a field only.
-            print(f"portfolio-scan: 0 events appended (feed skipped: {exc})")
-        except (EnvelopeError, ChainError) as exc:
-            print(f"ADAPT FAIL (portfolio-scan): {exc}", file=sys.stderr)
-            failures += 1
+        failures += _adapt_portfolio_scan()
     return 1 if failures else 0
 
 
@@ -161,7 +193,7 @@ def build_parser() -> argparse.ArgumentParser:
     adapt.add_argument(
         "--source",
         required=True,
-        choices=["high-power", "change-manager", "portfolio-scan", "all"],
+        choices=["high-power", "change-manager", "mac-conformance-facts", "portfolio-scan", "all"],
     )
     adapt.add_argument("--reanchor", action="store_true")
     adapt.set_defaults(func=_cmd_adapt)

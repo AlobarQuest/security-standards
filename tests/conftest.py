@@ -61,6 +61,16 @@ def _no_real_portfolio_feed(tmp_path, monkeypatch):
     monkeypatch.setenv("FACTORY_EVENTS_PORTFOLIO_FEED", str(tmp_path / "no-portfolio-feed.json"))
 
 
+@pytest.fixture(autouse=True)
+def _no_real_mac_conformance_inputs(tmp_path, monkeypatch):
+    """No test reads the Mac's real infra-drift reports, LaunchAgents or Claude settings:
+    `adapt --source all` reads all three, so every test points them at absent paths under
+    tmp_path."""
+    monkeypatch.setenv("INFRADRIFT_REPORT_DIR", str(tmp_path / "no-infra-drift-reports"))
+    monkeypatch.setenv("LAUNCHAGENTS_DIR", str(tmp_path / "no-launchagents"))
+    monkeypatch.setenv("CLAUDE_SETTINGS_JSON", str(tmp_path / "no-claude-settings.json"))
+
+
 class MemoryChain:
     """An in-memory stand-in for the database chain: db.append_event and db.event_ids, linked
     by the same formula. `make check-integration` runs the real one."""

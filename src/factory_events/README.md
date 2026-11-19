@@ -16,10 +16,12 @@ writes or verifies a file since. Spec:
   direct event. Runtimes/executors declare identity by emitting with their
   registered actor id (validated against `registry/`). Refuses with
   `no chain password is set` when neither password is set.
-- `adapt --source high-power|change-manager|portfolio-scan|all [--reanchor]` —
+- `adapt --source high-power|change-manager|mac-conformance-facts|portfolio-scan|all [--reanchor]` —
   translate source logs (watermarked, idempotent; `--reanchor` accepts a
   rewritten high-power source file and re-ingests with event_id dedupe). `all`
-  runs the three in that order. Each prints `<source>: N events appended`.
+  runs the four in that order. Each prints `<source>: N events appended`.
+  `mac-conformance-facts` appends one `mac_conformance.reported` event per
+  infra-drift report (see "The Mac's conformance facts").
   `portfolio-scan` appends one `portfolio.scanned` event per scan from the
   portfolio scan's feed (see "The portfolio scan's feed").
 - `verify [--against-anchor | --record-anchor]` — walk the database chain's
@@ -60,6 +62,58 @@ names a field and never its content, and the exit doesn't change (decision
 item 6). The work carrier holding its repository-targeted records is the
 signal. An `EnvelopeError` or a `ChainError` fails the adapt, as the other
 sources' errors do.
+
+## The Mac's conformance facts (orchestrator ADR-0059 Amendment 13)
+
+`adapt --source mac-conformance-facts` records the three inputs of the bump
+driver's conformance claim that only the Mac has, ids and statuses only, for the
+bump driver's container to read. It reads them as project-standards'
+compliance matrix does, from the same paths and override variables:
+
+- The newest `YYYY-MM-DD.json` in `~/infra-drift/reports`
+  (`INFRADRIFT_REPORT_DIR`).
+- Each executor in `WIRING` (`adapters/mac_conformance.py`): a `launchagent:`
+  label is present when `~/Library/LaunchAgents/<label>.plist` is a file
+  (`LAUNCHAGENTS_DIR`); a `hook:` name is present when a token of a hook command
+  in `~/.claude/settings.json` (`CLAUDE_SETTINGS_JSON`) has that basename.
+  `WIRING` is every `launchagent:` and `hook:` entry a member declares in its
+  `PROJECT.md` `required_checks`, and nothing else. A member that declares a new
+  one must add it there.
+
+It appends one event per report, with these fields:
+
+- `action` `mac_conformance.reported`, `actor` `mac-conformance-facts` (a
+  registry label that no credential authenticates as), and `target` `null`.
+- `source.system` is `mac-conformance-facts`. For a readable report,
+  `timestamp` and `source.ref` are its `generated_at`, written in UTC with `Z`.
+- `event_id` is `deterministic_event_id("mac-conformance-facts", source.ref)`,
+  so a run that finds the same report again appends nothing, even when the
+  wiring changed since. One event per report keeps one event per `timestamp`.
+- `evidence` holds, in order:
+  - `{"type": "infra-drift-report", "generated_at": "<time>"}`;
+  - `{"type": "infra-drift-instance", "name": "<name>", "ok": true|false}` per
+    instance, where `ok` is false for any instance the matrix calls unusable;
+  - `{"type": "infra-drift-proposal", "instance": "<name>", "id": "<id>",
+    "target": {"uuid": "<uuid>", "name": "<name>"}}` per proposal, with `null`
+    for any of the three that isn't a string;
+  - `{"type": "wiring", "executor": "<kind>:<name>", "status": "present"|"absent"}`
+    per `WIRING` entry, in `WIRING`'s order.
+- `result` is `success` when every instance is ok, else `unknown`.
+
+No description, reasoning, question, error, path, command line or settings
+content is copied.
+
+A newest report the matrix calls unreadable (unreadable, not JSON, not an
+object with `generated_at` and `instances`, `instances` not an object, or
+`generated_at` not an ISO time) is recorded, not skipped. Its record has
+`source.ref` `unreadable:<file name>`, `timestamp` the run time, `result`
+`unknown`, and `{"type": "infra-drift-report-unreadable", "reason": "<field>"}`
+in place of the report's items; the wiring items follow. The run time is later
+than any earlier report's `generated_at`, so a reader taking the newest event by
+`timestamp` takes this record. With no report at all, `adapt` prints
+`mac-conformance-facts: 0 events appended (report skipped: <reason>)`, appends
+nothing, and the exit doesn't change (decision item 5). An `EnvelopeError` or a
+`ChainError` fails the adapt, as the other sources' errors do.
 
 ## The database chain (orchestrator ADR-0055 amendment 24)
 
@@ -194,9 +248,10 @@ holder at once.
 3. Runs verify --against-anchor, before anything appends: it checks
    `$FACTORY_EVENTS_HOME/state/chain-anchor.json` when that file exists, and is a plain
    database verify when it doesn't.
-4. Runs adapt all (high-power, change-manager, then the portfolio scan's feed), then
-   verify --record-anchor, which checks the anchor again and anchors the verified head. A bad
-   feed appends nothing and doesn't fail the run (see "The portfolio scan's feed").
+4. Runs adapt all (high-power, change-manager, the Mac's conformance facts, then the portfolio
+   scan's feed), then verify --record-anchor, which checks the anchor again and anchors the
+   verified head. A bad feed or a missing infra-drift report appends nothing and doesn't fail
+   the run (see "The portfolio scan's feed" and "The Mac's conformance facts").
 5. Pings success with the verify output.
 
 The password and the three settings reach only the `python -m factory_events` children, as an
