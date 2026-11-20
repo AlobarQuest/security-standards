@@ -54,3 +54,17 @@ def test_repo_defaults(tmp_path):
     m = load_map(p)
     assert m.repos[0].uses_bws is False
     assert m.repos[0].owns == []
+
+
+def test_real_map_is_internally_consistent():
+    """The checked-in map: every tool's home repo is declared, deploy targets are unique."""
+    from security_scan.governance.__main__ import DEFAULT_MAP
+
+    m = load_map(DEFAULT_MAP)
+    repos = {r.name for r in m.repos}
+    assert {t.home_repo for t in m.tools} <= repos
+    targets = [t.deploy_target for t in m.tools if t.artifact_class == "deployed"]
+    assert len(targets) == len(set(targets))
+    cs = {t.name: t for t in m.tools if t.home_repo == "code-standards"}
+    assert set(cs) == {"correction-recorder.sh", "quality-gate.sh"}
+    assert all(t.artifact_class == "deployed" and t.mode == "755" for t in cs.values())

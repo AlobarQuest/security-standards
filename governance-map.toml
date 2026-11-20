@@ -108,6 +108,34 @@ artifact_class = "deployed"
 deploy_target = "~/.claude/bin/activate-checkout.sh"
 mode = "755"
 
+# code-standards' two Claude Code hooks, registered so ~/.claude/OWNERSHIP.md names their source
+# and owner (design: control-plane hooks are hosted artifacts). `deployed` is the only class the
+# "Deployed artifacts -> source of truth" table renders, so it is the class that satisfies that.
+# Consequences, both by design:
+#   * security-standards' `make install` ALSO copies these from ~/Developer/code-standards
+#     (deploy_artifacts) and reconcile_control_plane commits them into the ~/.claude repo.
+#     `make verify` flags drift if the deployed copy differs from the code-standards source.
+#   * code-standards' own `make install` (hooks/install.sh) remains what registers them in
+#     settings.json; both installers copy the same file, so they cannot disagree.
+# The source files carry the matching "# Source of truth:" header (checked by `make verify`).
+[[tool]]
+name = "correction-recorder.sh"
+lane = "detect"
+home_repo = "code-standards"
+source = "hooks/correction-recorder.sh"
+artifact_class = "deployed"
+deploy_target = "~/.claude/hooks/correction-recorder.sh"
+mode = "755"
+
+[[tool]]
+name = "quality-gate.sh"
+lane = "detect"
+home_repo = "code-standards"
+source = "hooks/quality-gate.sh"
+artifact_class = "deployed"
+deploy_target = "~/.claude/hooks/quality-gate.sh"
+mode = "755"
+
 # ───────────────────── Control-plane host (version-control home of ~/.claude/) ─────────────────────
 # The ~/.claude/ directory is itself a git repo. It is NOT governed by security-standards
 # (no detect/mutate/approve lane) — it is the version-control HOME of the global config and
@@ -154,6 +182,13 @@ class = "tool-home"
 lane = "detect"
 owns = ["security_scan (python package)", "security-scan.sh", "skills-security-scan.sh", "bws-write-guard.sh", "bws-read-guard.sh", "bws-scan-gate.sh"]
 consumers = ["security-standards", "infraops-mcp-server", "change-manager"]
+
+[[repo]]
+name = "code-standards"
+path = "~/Developer/code-standards"
+class = "tool-home"
+lane = "detect"
+owns = ["code_standards (python CLI)", "correction-recorder.sh", "quality-gate.sh"]
 
 [[repo]]
 name = "factory-runner"
