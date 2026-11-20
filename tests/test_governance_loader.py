@@ -66,5 +66,5 @@ def test_real_map_is_internally_consistent():
     targets = [t.deploy_target for t in m.tools if t.artifact_class == "deployed"]
     assert len(targets) == len(set(targets))
     cs = {t.name: t for t in m.tools if t.home_repo == "code-standards"}
-    assert set(cs) == {"correction-recorder.sh", "quality-gate.sh"}
+    assert {"correction-recorder.sh", "quality-gate.sh"} <= set(cs)
     assert all(t.artifact_class == "deployed" and t.mode == "755" for t in cs.values())

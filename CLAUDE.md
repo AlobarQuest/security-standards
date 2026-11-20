@@ -20,6 +20,9 @@ Because the deploy reads **this working tree**, a stale `main` is dangerous: run
 workflow only *runs* the scanner; it does not deploy.) Keep `main` current before any
 `make install`.
 
+`make install` also reads `~/Developer/code-standards` for the two code-standards hooks
+(`correction-recorder.sh`, `quality-gate.sh`), so that checkout must be on a current `main` too.
+
 ## SessionStart auto-sync hook
 
 `.claude/hooks/session-sync.sh` (wired via `.claude/settings.json`) keeps `main` current

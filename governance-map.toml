@@ -114,9 +114,10 @@ mode = "755"
 # Consequences, both by design:
 #   * security-standards' `make install` ALSO copies these from ~/Developer/code-standards
 #     (deploy_artifacts) and reconcile_control_plane commits them into the ~/.claude repo.
-#     `make verify` flags drift if the deployed copy differs from the code-standards source.
-#   * code-standards' own `make install` (hooks/install.sh) remains what registers them in
-#     settings.json; both installers copy the same file, so they cannot disagree.
+#   * code-standards' own `make install` (hooks/install.sh) still registers them in settings.json,
+#     but it copies from ITS OWN script dir (possibly a worktree), while deploy.py copies from the
+#     ~/Developer/code-standards main checkout. The deployed copy must therefore match that main
+#     checkout; `make verify` and the weekly Check 14 flag any difference.
 # The source files carry the matching "# Source of truth:" header (checked by `make verify`).
 [[tool]]
 name = "correction-recorder.sh"
@@ -150,7 +151,7 @@ owns = [
   "~/.claude/CLAUDE.md (global session instructions)",
   "~/.claude/RTK.md",
   "~/.claude/settings.json",
-  "version-tracking of all deployed hooks + bin/ (source-of-truth: security-standards)",
+  "version-tracking of all deployed hooks + bin/ (source-of-truth: security-standards, code-standards)",
 ]
 
 [[tool]]

@@ -20,10 +20,15 @@ def _source_path(tool: Tool, manifest: Manifest) -> Path:
 
 
 def deploy_artifacts(manifest: Manifest) -> list[tuple[str, str]]:
+    deployed = [t for t in manifest.tools if t.artifact_class == "deployed"]
+    missing = [str(p) for t in deployed if not (p := _source_path(t, manifest)).is_file()]
+    if missing:
+        # Fail before copying anything: a partial deploy leaves the control plane half-updated.
+        raise FileNotFoundError(
+            "deploy aborted, nothing copied; missing source file(s): " + ", ".join(missing)
+        )
     actions: list[tuple[str, str]] = []
-    for t in manifest.tools:
-        if t.artifact_class != "deployed":
-            continue
+    for t in deployed:
         src = _source_path(t, manifest)
         dst = _expand(t.deploy_target)
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -54,9 +59,16 @@ def _toplevel(path: Path) -> Path | None:
 def _repo_head(manifest: Manifest, repo_name: str) -> str:
     for r in manifest.repos:
         if r.name == repo_name:
-            h = _git(_expand(r.path), "rev-parse", "--short", "HEAD")
+            root = _expand(r.path)
+            h = _git(root, "rev-parse", "--short", "HEAD")
             if h.returncode == 0:
-                return f"{repo_name}@{h.stdout.strip()}"
+                sources = [
+                    t.source
+                    for t in manifest.tools
+                    if t.home_repo == repo_name and t.artifact_class == "deployed"
+                ]
+                dirty = _git(root, "status", "--porcelain", "--", *sources).stdout.strip()
+                return f"{repo_name}@{h.stdout.strip()}{'-dirty' if dirty else ''}"
     return repo_name
 
 
@@ -129,7 +141,9 @@ def verify_artifacts(manifest: Manifest) -> list[tuple[str, str]]:
             continue
         src = _source_path(t, manifest)
         dst = _expand(t.deploy_target)
-        if not dst.exists():
+        if not src.is_file():
+            problems.append((t.name, "source-missing"))
+        elif not dst.exists():
             problems.append((t.name, "missing"))
         elif src.read_bytes() != dst.read_bytes():
             problems.append((t.name, "drift"))
