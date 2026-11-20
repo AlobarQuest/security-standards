@@ -46,6 +46,8 @@ else
     }
 fi
 activate_checkout "$HOME/Projects/security-standards"
+# `make install` also reads these two hooks from this checkout (governance-map.toml).
+activate_checkout "$HOME/Developer/code-standards"
 
 
 # Pin a Python >= 3.14 (the package floor) for our own module subprocesses (read-guard self-check,

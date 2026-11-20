@@ -218,3 +218,45 @@ def test_reconcile_noop_when_target_not_git(tmp_path):
     # must not raise and must report no control-plane commits
     actions = reconcile_control_plane(m)
     assert all("committed" not in note for _, note in actions)
+
+
+def test_deploy_aborts_before_copying_when_any_source_missing(tmp_path):
+    import pytest
+
+    m, target = _manifest(tmp_path)
+    ghost = Tool(
+        name="ghost.sh",
+        lane="detect",
+        home_repo="home",
+        source="scripts/ghost.sh",
+        artifact_class="deployed",
+        deploy_target=str(tmp_path / "deployed" / "ghost.sh"),
+        mode="755",
+    )
+    m = Manifest(tools=[*m.tools, ghost], repos=m.repos, runtime_dirs=[])
+    with pytest.raises(FileNotFoundError, match="ghost.sh"):
+        deploy_artifacts(m)
+    assert not target.exists()
+
+
+def test_verify_reports_missing_source(tmp_path):
+    m, target = _manifest(tmp_path)
+    deploy_artifacts(m)
+    (tmp_path / "home" / "scripts" / "tool.sh").unlink()
+    assert verify_artifacts(m) == [("tool.sh", "source-missing")]
+
+
+def test_repo_head_marks_dirty_sources(tmp_path):
+    from security_scan.governance.deploy import _repo_head
+
+    m, _ = _manifest(tmp_path)
+    home = tmp_path / "home"
+    for args in (["init", "-q"], ["add", "."]):
+        _git(home, *args)
+    _git(home, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x")
+    assert _repo_head(m, "home").endswith("-dirty") is False
+    (home / "scripts" / "tool.sh").write_text("changed\n")
+    assert _repo_head(m, "home").endswith("-dirty")
+    _git(home, "checkout", "--", ".")
+    (home / "other.txt").write_text("unrelated\n")
+    assert not _repo_head(m, "home").endswith("-dirty")
