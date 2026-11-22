@@ -31,6 +31,15 @@ that rule, made concrete.
    connection string at run time. That keeps config changes out of the secret store and keeps
    each secret rotatable without touching its settings. (Devon, 2026-11-14: "I am not liking
    that we are storing code, effectively, in BWS as a secret.")
+8. **A reviewed broker may read BWS secrets on behalf of other consumers.** Its allowlist, changed
+   only through a reviewed PR, is those consumers' manifest (rule 4). A consumer behind a broker
+   holds no BWS token and gets only the secrets its own allowlist entry names. The broker's own
+   token follows every rule above: never in a tracked file, sourced at runtime from a gitignored
+   env file, the Keychain, or the platform's secret variable. The list of brokers is closed: today
+   it is the SDS lane secrets broker (`scripts/secrets_broker.py` in `AlobarQuest/orchestrator`;
+   allowlist `lanes/secrets-broker/allowlist.toml`), and adding another broker means amending this
+   rule through a reviewed PR. Nothing else changes: any consumer not behind a broker holds its
+   own token and its own manifest.
 
 ## How to actually fetch a secret (copy these patterns)
 

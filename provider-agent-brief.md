@@ -29,7 +29,7 @@ PROPOSALS: <infra/deploy changes that need Devon's explicit approval — or "non
 
 ## Ground yourself in this repo before answering
 - `src/security_scan/` — the deterministic scanner. Entry: `cli.py`; check
-  definitions in `rules.py`; the canonical BWS token shape in `token_shapes.py`;
+  definitions in `rules.py`; the canonical secret shapes in `token_shapes.py`;
   the PreToolUse read-guard in `read_guard.py`/`predicates.py`; fixture/doc
   exemptions in `allowlist.py`; the manifest model in `manifest.py`.
 - `skill/SKILL.md` — the `security-standards` integration skill consumers run
