@@ -211,7 +211,22 @@ name = "infraops-mcp-server"
 path = "~/Projects/infraops-mcp-server"
 class = "tool-home"
 lane = "mutate"
-owns = ["infraops MCP server", "drift-audit.sh", "change-window.sh", "security-drift subsystem"]
+owns = [
+  "infraops MCP server",
+  "drift-audit.sh",
+  "change-mgr-cli run-window (the change-window executor)",
+  "change-window.sh (the Mac launcher, kept for rollback)",
+  "security-drift subsystem",
+]
+
+# The change-window lane runs infraops' run-window from a fresh clone of infraops main each pass
+# (orchestrator ADR-0059 amendments 14 and 15, D-66 A); the orchestrator owns only the launcher.
+[[repo]]
+name = "orchestrator"
+path = "~/Projects/orchestrator"
+class = "tool-home"
+lane = "execute"
+owns = ["change-window lane launcher (scripts/run-change-window.sh, lanes/change-window/)"]
 
 [[repo]]
 name = "change-manager"

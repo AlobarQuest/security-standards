@@ -40,12 +40,12 @@ SETTINGS_ENV = "CLAUDE_SETTINGS_JSON"
 # Every `launchagent:` and `hook:` executor a member declares in its PROJECT.md `required_checks`,
 # and nothing else (Amendment 13 verify items, the wiring bounds). Read from the 13 repositories
 # of orchestrator `docs/operations/membership-seed.toml` at their `main` on 2026-11-18:
-# change-manager, project-standards and security-standards declare these five; no other member
-# declares one. A member that declares a new one must add it here, or the container reads it as
-# not wired.
+# project-standards and security-standards declare these four; no other member declares one.
+# change-manager's `launchagent:com.devon.change-window` left when the window moved to the
+# orchestrator's `change-window` lane (ADR-0059 increment 8). A member that declares a new one
+# must add it here, or the container reads it as not wired.
 WIRING = (
     "hook:bws-scan-gate.sh",
-    "launchagent:com.devon.change-window",
     "launchagent:com.devon.factory-events",
     "launchagent:com.devon.portfolio-scan",
     "launchagent:com.devon.security-scan",
